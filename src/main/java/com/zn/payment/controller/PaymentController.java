@@ -184,21 +184,27 @@ public class PaymentController {
 
             // Route based on paymentType metadata
             if (event != null && "checkout.session.completed".equals(event.getType())) {
-                com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) event.getDataObjectDeserializer().getObject().get();
-                String paymentType = session.getMetadata() != null ? session.getMetadata().get("paymentType") : null;
-                log.info("Stripe session metadata paymentType: {}", paymentType);
-                if ("discount-registration".equals(paymentType)) {
-                    // Discount registration webhook logic
-                    log.info("Processing discount-registration webhook");
-                    // You can call your discount registration service here
-                    // opticsStripeService.processDiscountRegistrationWebhook(event);
-                    // Or route to a dedicated service if needed
+                java.util.Optional<com.stripe.model.StripeObject> sessionOpt = event.getDataObjectDeserializer().getObject();
+                if (sessionOpt.isPresent() && sessionOpt.get() instanceof com.stripe.model.checkout.Session) {
+                    com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) sessionOpt.get();
+                    String paymentType = session.getMetadata() != null ? session.getMetadata().get("paymentType") : null;
+                    log.info("Stripe session metadata paymentType: {}", paymentType);
+                    if ("discount-registration".equals(paymentType)) {
+                        // Discount registration webhook logic
+                        log.info("Processing discount-registration webhook");
+                        // You can call your discount registration service here
+                        // opticsStripeService.processDiscountRegistrationWebhook(event);
+                        // Or route to a dedicated service if needed
+                    } else {
+                        // Normal payment webhook logic
+                        log.info("Processing normal payment webhook");
+                        // opticsStripeService.processNormalPaymentWebhook(event);
+                    }
+                    return ResponseEntity.ok().body("Webhook processed successfully");
                 } else {
-                    // Normal payment webhook logic
-                    log.info("Processing normal payment webhook");
-                    // opticsStripeService.processNormalPaymentWebhook(event);
+                    log.error("❌ Stripe event data could not be deserialized to Session");
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid session data in webhook");
                 }
-                return ResponseEntity.ok().body("Webhook processed successfully");
             } else {
                 // Fallback: process with all services as before
                 boolean processed = false;
