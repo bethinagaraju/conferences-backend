@@ -24,14 +24,13 @@ import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.param.checkout.SessionCreateParams;
 import com.zn.optics.entity.OpticsPricingConfig;
-// import com.zn.optics.entity.OpticsRegistrationForm; // TODO: Uncomment when IOpricsRegistrationFormRepository is fixed
-// import com.zn.renewable.entity.RenewableRegistrationForm; // TODO: Remove when IOpricsRegistrationFormRepository is fixed to use OpticsRegistrationForm
+import com.zn.optics.entity.OpticsRegistrationForm;
+import com.zn.optics.repository.IOpricsRegistrationFormRepository;
+import com.zn.optics.repository.IOpticsPricingConfigRepository;
 import com.zn.payment.dto.CheckoutRequest;
 import com.zn.payment.dto.OpticsPaymentResponseDTO;
 import com.zn.payment.optics.entity.OpticsPaymentRecord;
 import com.zn.payment.optics.repository.OpticsPaymentRecordRepository;
-import com.zn.optics.repository.IOpticsPricingConfigRepository;
-import com.zn.optics.repository.IOpricsRegistrationFormRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -885,9 +884,6 @@ public class OpticsStripeService {
                 return;
             }
             
-            // TODO: CRITICAL REPOSITORY ISSUE - IOpricsRegistrationFormRepository has wrong generic type (RenewableRegistrationForm instead of OpticsRegistrationForm)
-            // This entire registration form integration is temporarily disabled until the repository interface is fixed
-            /*
             // Find the most recent registration form for this customer email
             OpticsRegistrationForm existingRegistration = registrationFormRepository.findTopByEmailOrderByIdDesc(customerEmail);
             
@@ -917,9 +913,6 @@ public class OpticsStripeService {
             
             log.info("✅ Successfully linked registration form ID: {} to payment record ID: {}", 
                     existingRegistration.getId(), paymentRecord.getId());
-            */
-            
-            log.warn("⚠️ Registration form integration disabled due to repository interface issue - IOpricsRegistrationFormRepository needs to use OpticsRegistrationForm generic type");
             
         } catch (Exception e) {
             log.error("❌ Error in manual registration linking for payment record ID {}: {}", 
@@ -1333,9 +1326,6 @@ public class OpticsStripeService {
                 return;
             }
             
-            // TODO: CRITICAL REPOSITORY ISSUE - IOpricsRegistrationFormRepository has wrong generic type (RenewableRegistrationForm instead of OpticsRegistrationForm)
-            // This entire registration form integration is temporarily disabled until the repository interface is fixed
-            /*
             // Find the most recent registration form for this customer email
             OpticsRegistrationForm existingRegistration = registrationFormRepository.findTopByEmailOrderByIdDesc(customerEmail);
             
@@ -1371,9 +1361,6 @@ public class OpticsStripeService {
             
             log.info("✅ Successfully linked registration form ID: {} to payment record ID: {}", 
                     existingRegistration.getId(), paymentRecord.getId());
-            */
-            
-            log.warn("⚠️ Registration form integration disabled due to repository interface issue - IOpricsRegistrationFormRepository needs to use OpticsRegistrationForm generic type");
             
         } catch (Exception e) {
             log.error("❌ Error verifying/creating association for payment record ID {}: {}", 
@@ -1390,9 +1377,6 @@ public class OpticsStripeService {
     public void linkRegistrationToPayment(Long registrationFormId, String sessionId) {
         log.info("🔗 Linking registration form ID: {} to payment record for session: {}", registrationFormId, sessionId);
         
-        // TODO: CRITICAL REPOSITORY ISSUE - IOpricsRegistrationFormRepository has wrong generic type (RenewableRegistrationForm instead of OpticsRegistrationForm)
-        // This entire method is temporarily disabled until the repository interface is fixed
-        /*
         try {
             // Find the registration form
             OpticsRegistrationForm registrationForm = registrationFormRepository.findById(registrationFormId)
@@ -1418,9 +1402,5 @@ public class OpticsStripeService {
                     registrationFormId, sessionId, e.getMessage(), e);
             throw new RuntimeException("Failed to create mandatory registration-payment association: " + e.getMessage());
         }
-        */
-        
-        log.warn("⚠️ Registration form linking disabled due to repository interface issue - IOpricsRegistrationFormRepository needs to use OpticsRegistrationForm generic type");
-        throw new RuntimeException("Registration form linking temporarily disabled - repository interface needs to be fixed");
     }
 }
