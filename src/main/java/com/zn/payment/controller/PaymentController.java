@@ -153,61 +153,87 @@ public class PaymentController {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(request.getInputStream()))) {
             payload = reader.lines().collect(Collectors.joining("\n"));
         }
-        
+
         String sigHeader = request.getHeader("Stripe-Signature");
-        log.info("Webhook payload length: {}, Signature header present: {}", 
-                payload.length(), sigHeader != null);
-        
+        log.info("Webhook payload length: {}, Signature header present: {}", payload.length(), sigHeader != null);
+
         if (sigHeader == null || sigHeader.isEmpty()) {
             log.error("⚠️ Missing Stripe-Signature header");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Missing signature header");
         }
-        
+
         try {
-            // For webhooks, we try all services until one handles it successfully
-            boolean processed = false;
-            
-            // Try optics service first
+            // Parse event using Optics service (all services use same Stripe event structure)
+            Event event = null;
             try {
-                Event event = opticsStripeService.constructWebhookEvent(payload, sigHeader);
-                opticsStripeService.processWebhookEvent(event);
-                processed = true;
-                log.info("✅ Webhook processed by Optics service. Event type: {}", event.getType());
+                event = opticsStripeService.constructWebhookEvent(payload, sigHeader);
             } catch (Exception e) {
-                log.debug("Optics service couldn't process webhook: {}", e.getMessage());
-            }
-            
-            // Try nursing service if not processed
-            if (!processed) {
+                log.debug("Optics service couldn't parse event: {}", e.getMessage());
                 try {
-                    Event event = nursingStripeService.constructWebhookEvent(payload, sigHeader);
-                    nursingStripeService.processWebhookEvent(event);
-                    processed = true;
-                    log.info("✅ Webhook processed by Nursing service. Event type: {}", event.getType());
-                } catch (Exception e) {
-                    log.debug("Nursing service couldn't process webhook: {}", e.getMessage());
+                    event = nursingStripeService.constructWebhookEvent(payload, sigHeader);
+                } catch (Exception e2) {
+                    log.debug("Nursing service couldn't parse event: {}", e2.getMessage());
+                    try {
+                        event = renewableStripeService.constructWebhookEvent(payload, sigHeader);
+                    } catch (Exception e3) {
+                        log.error("No service could parse Stripe event: {}", e3.getMessage());
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Webhook event parse failed");
+                    }
                 }
             }
-            
-            // Try renewable service if not processed
-            if (!processed) {
-                try {
-                    Event event = renewableStripeService.constructWebhookEvent(payload, sigHeader);
-                    renewableStripeService.processWebhookEvent(event);
-                    processed = true;
-                    log.info("✅ Webhook processed by Renewable service. Event type: {}", event.getType());
-                } catch (Exception e) {
-                    log.debug("Renewable service couldn't process webhook: {}", e.getMessage());
+
+            // Route based on paymentType metadata
+            if (event != null && "checkout.session.completed".equals(event.getType())) {
+                com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) event.getDataObjectDeserializer().getObject().get();
+                String paymentType = session.getMetadata() != null ? session.getMetadata().get("paymentType") : null;
+                log.info("Stripe session metadata paymentType: {}", paymentType);
+                if ("discount-registration".equals(paymentType)) {
+                    // Discount registration webhook logic
+                    log.info("Processing discount-registration webhook");
+                    // You can call your discount registration service here
+                    // opticsStripeService.processDiscountRegistrationWebhook(event);
+                    // Or route to a dedicated service if needed
+                } else {
+                    // Normal payment webhook logic
+                    log.info("Processing normal payment webhook");
+                    // opticsStripeService.processNormalPaymentWebhook(event);
                 }
-            }
-            
-            if (processed) {
                 return ResponseEntity.ok().body("Webhook processed successfully");
             } else {
-                log.error("❌ No service could process the webhook");
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Webhook processing failed");
+                // Fallback: process with all services as before
+                boolean processed = false;
+                try {
+                    opticsStripeService.processWebhookEvent(event);
+                    processed = true;
+                    log.info("✅ Webhook processed by Optics service. Event type: {}", event.getType());
+                } catch (Exception e) {
+                    log.debug("Optics service couldn't process webhook: {}", e.getMessage());
+                }
+                if (!processed) {
+                    try {
+                        nursingStripeService.processWebhookEvent(event);
+                        processed = true;
+                        log.info("✅ Webhook processed by Nursing service. Event type: {}", event.getType());
+                    } catch (Exception e) {
+                        log.debug("Nursing service couldn't process webhook: {}", e.getMessage());
+                    }
+                }
+                if (!processed) {
+                    try {
+                        renewableStripeService.processWebhookEvent(event);
+                        processed = true;
+                        log.info("✅ Webhook processed by Renewable service. Event type: {}", event.getType());
+                    } catch (Exception e) {
+                        log.debug("Renewable service couldn't process webhook: {}", e.getMessage());
+                    }
+                }
+                if (processed) {
+                    return ResponseEntity.ok().body("Webhook processed successfully");
+                } else {
+                    log.error("❌ No service could process the webhook");
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Webhook processing failed");
+                }
             }
-            
         } catch (Exception e) {
             log.error("❌ Error processing webhook: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing failed");
