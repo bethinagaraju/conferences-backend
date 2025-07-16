@@ -182,30 +182,29 @@ public class PaymentController {
                 }
             }
 
-            // Route based on paymentType metadata
-            if (event != null && "checkout.session.completed".equals(event.getType())) {
-                java.util.Optional<com.stripe.model.StripeObject> sessionOpt = event.getDataObjectDeserializer().getObject();
-                if (sessionOpt.isPresent() && sessionOpt.get() instanceof com.stripe.model.checkout.Session) {
-                    com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) sessionOpt.get();
-                    String paymentType = session.getMetadata() != null ? session.getMetadata().get("paymentType") : null;
-                    log.info("Stripe session metadata paymentType: {}", paymentType);
-                    if ("discount-registration".equals(paymentType)) {
-                        // Discount registration webhook logic
-                        log.info("Processing discount-registration webhook");
-                        // You can call your discount registration service here
-                        // opticsStripeService.processDiscountRegistrationWebhook(event);
-                        // Or route to a dedicated service if needed
-                    } else {
-                        // Normal payment webhook logic
-                        log.info("Processing normal payment webhook");
-                        // opticsStripeService.processNormalPaymentWebhook(event);
-                    }
-                    return ResponseEntity.ok().body("Webhook processed successfully");
-                } else {
-                    log.error("❌ Stripe event data could not be deserialized to Session");
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid session data in webhook");
+            // Enhanced webhook routing based on metadata and event type
+            if (event != null) {
+                String eventType = event.getType();
+                log.info("Processing webhook event type: {}", eventType);
+                
+                // Handle different webhook event types
+                switch (eventType) {
+                    case "checkout.session.completed":
+                        return handleCheckoutSessionCompleted(event);
+                    case "payment_intent.succeeded":
+                        return handlePaymentIntentSucceeded(event);
+                    case "payment_intent.payment_failed":
+                        return handlePaymentIntentFailed(event);
+                    case "checkout.session.expired":
+                        return handleCheckoutSessionExpired(event);
+                    default:
+                        log.info("⚠️ Unhandled event type: {} - trying fallback processing", eventType);
+                        break;
                 }
-            } else {
+            }
+            
+            // Fallback processing if specific handlers didn't work
+            {
                 // Fallback: process with all services as before
                 boolean processed = false;
                 try {
@@ -495,5 +494,240 @@ public class PaymentController {
                 .paymentStatus(errorMessage)
                 .description("Error: " + errorMessage)
                 .build();
+    }
+    
+    /**
+     * Handle checkout.session.completed webhook events
+     * Routes to appropriate service based on metadata or tries all services
+     */
+    private ResponseEntity<String> handleCheckoutSessionCompleted(Event event) {
+        log.info("🎯 Handling checkout.session.completed event");
+        
+        try {
+            java.util.Optional<com.stripe.model.StripeObject> sessionOpt = event.getDataObjectDeserializer().getObject();
+            if (sessionOpt.isPresent() && sessionOpt.get() instanceof com.stripe.model.checkout.Session) {
+                com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) sessionOpt.get();
+                String paymentType = session.getMetadata() != null ? session.getMetadata().get("paymentType") : null;
+                String sessionId = session.getId();
+                
+                log.info("Session ID: {}, Payment Type: {}", sessionId, paymentType);
+                
+                // Route based on payment type metadata
+                if ("discount-registration".equals(paymentType)) {
+                    log.info("Processing discount-registration webhook");
+                    return processDiscountWebhook(event, session);
+                } else {
+                    log.info("Processing normal payment webhook");
+                    return processPaymentWebhook(event, session);
+                }
+            } else {
+                log.error("❌ Could not deserialize session from checkout.session.completed event");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid session data");
+            }
+        } catch (Exception e) {
+            log.error("❌ Error handling checkout.session.completed: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error processing checkout session completed");
+        }
+    }
+    
+    /**
+     * Handle payment_intent.succeeded webhook events
+     */
+    private ResponseEntity<String> handlePaymentIntentSucceeded(Event event) {
+        log.info("🎯 Handling payment_intent.succeeded event");
+        
+        boolean processed = false;
+        try {
+            opticsStripeService.processWebhookEvent(event);
+            processed = true;
+            log.info("✅ Payment intent succeeded processed by Optics service");
+        } catch (Exception e) {
+            log.debug("Optics service couldn't process payment_intent.succeeded: {}", e.getMessage());
+        }
+        
+        if (!processed) {
+            try {
+                nursingStripeService.processWebhookEvent(event);
+                processed = true;
+                log.info("✅ Payment intent succeeded processed by Nursing service");
+            } catch (Exception e) {
+                log.debug("Nursing service couldn't process payment_intent.succeeded: {}", e.getMessage());
+            }
+        }
+        
+        if (!processed) {
+            try {
+                renewableStripeService.processWebhookEvent(event);
+                processed = true;
+                log.info("✅ Payment intent succeeded processed by Renewable service");
+            } catch (Exception e) {
+                log.debug("Renewable service couldn't process payment_intent.succeeded: {}", e.getMessage());
+            }
+        }
+        
+        if (processed) {
+            return ResponseEntity.ok().body("Payment intent succeeded processed successfully");
+        } else {
+            log.error("❌ No service could process payment_intent.succeeded");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Payment intent processing failed");
+        }
+    }
+    
+    /**
+     * Handle payment_intent.payment_failed webhook events
+     */
+    private ResponseEntity<String> handlePaymentIntentFailed(Event event) {
+        log.info("🎯 Handling payment_intent.payment_failed event");
+        
+        boolean processed = false;
+        try {
+            opticsStripeService.processWebhookEvent(event);
+            processed = true;
+            log.info("✅ Payment intent failed processed by Optics service");
+        } catch (Exception e) {
+            log.debug("Optics service couldn't process payment_intent.payment_failed: {}", e.getMessage());
+        }
+        
+        if (!processed) {
+            try {
+                nursingStripeService.processWebhookEvent(event);
+                processed = true;
+                log.info("✅ Payment intent failed processed by Nursing service");
+            } catch (Exception e) {
+                log.debug("Nursing service couldn't process payment_intent.payment_failed: {}", e.getMessage());
+            }
+        }
+        
+        if (!processed) {
+            try {
+                renewableStripeService.processWebhookEvent(event);
+                processed = true;
+                log.info("✅ Payment intent failed processed by Renewable service");
+            } catch (Exception e) {
+                log.debug("Renewable service couldn't process payment_intent.payment_failed: {}", e.getMessage());
+            }
+        }
+        
+        if (processed) {
+            return ResponseEntity.ok().body("Payment intent failed processed successfully");
+        } else {
+            log.error("❌ No service could process payment_intent.payment_failed");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Payment intent failed processing failed");
+        }
+    }
+    
+    /**
+     * Handle checkout.session.expired webhook events
+     */
+    private ResponseEntity<String> handleCheckoutSessionExpired(Event event) {
+        log.info("🎯 Handling checkout.session.expired event");
+        
+        boolean processed = false;
+        try {
+            opticsStripeService.processWebhookEvent(event);
+            processed = true;
+            log.info("✅ Session expired processed by Optics service");
+        } catch (Exception e) {
+            log.debug("Optics service couldn't process checkout.session.expired: {}", e.getMessage());
+        }
+        
+        if (!processed) {
+            try {
+                nursingStripeService.processWebhookEvent(event);
+                processed = true;
+                log.info("✅ Session expired processed by Nursing service");
+            } catch (Exception e) {
+                log.debug("Nursing service couldn't process checkout.session.expired: {}", e.getMessage());
+            }
+        }
+        
+        if (!processed) {
+            try {
+                renewableStripeService.processWebhookEvent(event);
+                processed = true;
+                log.info("✅ Session expired processed by Renewable service");
+            } catch (Exception e) {
+                log.debug("Renewable service couldn't process checkout.session.expired: {}", e.getMessage());
+            }
+        }
+        
+        if (processed) {
+            return ResponseEntity.ok().body("Session expired processed successfully");
+        } else {
+            log.error("❌ No service could process checkout.session.expired");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Session expired processing failed");
+        }
+    }
+    
+    /**
+     * Process discount webhooks based on domain routing
+     */
+    private ResponseEntity<String> processDiscountWebhook(Event event, com.stripe.model.checkout.Session session) {
+        String sessionId = session.getId();
+        log.info("Processing discount webhook for session: {}", sessionId);
+        
+        // Try to route based on session metadata or customer email domain
+        String customerEmail = session.getCustomerEmail();
+        if (session.getCustomerDetails() != null && session.getCustomerDetails().getEmail() != null) {
+            customerEmail = session.getCustomerDetails().getEmail();
+        }
+        
+        log.info("Customer email from session: {}", customerEmail);
+        
+        // Process discount webhook by trying all services
+        boolean processed = false;
+        
+        log.info("✅ Discount webhook received for session: {}", sessionId);
+        log.info("Note: Discount services will be updated to handle events directly");
+        
+        // For now, return success as the discount processing logic needs to be refactored
+        // to handle Event objects directly rather than HttpServletRequest
+        return ResponseEntity.ok().body("Discount webhook received - processing logic to be updated");
+    }
+    
+    /**
+     * Process normal payment webhooks
+     */
+    private ResponseEntity<String> processPaymentWebhook(Event event, com.stripe.model.checkout.Session session) {
+        String sessionId = session.getId();
+        log.info("Processing payment webhook for session: {}", sessionId);
+        
+        boolean processed = false;
+        
+        // Try all payment services
+        try {
+            opticsStripeService.processWebhookEvent(event);
+            processed = true;
+            log.info("✅ Payment webhook processed by Optics service");
+        } catch (Exception e) {
+            log.debug("Optics service couldn't process payment webhook: {}", e.getMessage());
+        }
+        
+        if (!processed) {
+            try {
+                nursingStripeService.processWebhookEvent(event);
+                processed = true;
+                log.info("✅ Payment webhook processed by Nursing service");
+            } catch (Exception e) {
+                log.debug("Nursing service couldn't process payment webhook: {}", e.getMessage());
+            }
+        }
+        
+        if (!processed) {
+            try {
+                renewableStripeService.processWebhookEvent(event);
+                processed = true;
+                log.info("✅ Payment webhook processed by Renewable service");
+            } catch (Exception e) {
+                log.debug("Renewable service couldn't process payment webhook: {}", e.getMessage());
+            }
+        }
+        
+        if (processed) {
+            return ResponseEntity.ok().body("Payment webhook processed successfully");
+        } else {
+            log.error("❌ No payment service could process the webhook");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Payment webhook processing failed");
+        }
     }
 }
