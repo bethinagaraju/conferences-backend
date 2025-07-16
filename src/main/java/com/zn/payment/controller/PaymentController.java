@@ -215,6 +215,70 @@ public class PaymentController {
     }
     
     /**
+     * Alternative webhook endpoints for domain-specific processing
+     * These can be used if you want to configure separate webhook URLs in Stripe
+     */
+    @PostMapping("/webhook/optics")
+    public ResponseEntity<String> handleOpticsWebhook(HttpServletRequest request) throws IOException {
+        log.info("Received Optics-specific webhook request");
+        
+        String payload = readPayload(request);
+        String sigHeader = request.getHeader("Stripe-Signature");
+        
+        try {
+            Event event = opticsStripeService.constructWebhookEvent(payload, sigHeader);
+            opticsStripeService.processWebhookEvent(event);
+            
+            log.info("✅ Optics webhook processed successfully. Event type: {}", event.getType());
+            return ResponseEntity.ok().body("Optics webhook processed successfully");
+            
+        } catch (Exception e) {
+            log.error("❌ Error processing Optics webhook: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Optics webhook processing failed");
+        }
+    }
+    
+    @PostMapping("/webhook/nursing")
+    public ResponseEntity<String> handleNursingWebhook(HttpServletRequest request) throws IOException {
+        log.info("Received Nursing-specific webhook request");
+        
+        String payload = readPayload(request);
+        String sigHeader = request.getHeader("Stripe-Signature");
+        
+        try {
+            Event event = nursingStripeService.constructWebhookEvent(payload, sigHeader);
+            nursingStripeService.processWebhookEvent(event);
+            
+            log.info("✅ Nursing webhook processed successfully. Event type: {}", event.getType());
+            return ResponseEntity.ok().body("Nursing webhook processed successfully");
+            
+        } catch (Exception e) {
+            log.error("❌ Error processing Nursing webhook: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Nursing webhook processing failed");
+        }
+    }
+    
+    @PostMapping("/webhook/renewable")
+    public ResponseEntity<String> handleRenewableWebhook(HttpServletRequest request) throws IOException {
+        log.info("Received Renewable-specific webhook request");
+        
+        String payload = readPayload(request);
+        String sigHeader = request.getHeader("Stripe-Signature");
+        
+        try {
+            Event event = renewableStripeService.constructWebhookEvent(payload, sigHeader);
+            renewableStripeService.processWebhookEvent(event);
+            
+            log.info("✅ Renewable webhook processed successfully. Event type: {}", event.getType());
+            return ResponseEntity.ok().body("Renewable webhook processed successfully");
+            
+        } catch (Exception e) {
+            log.error("❌ Error processing Renewable webhook: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Renewable webhook processing failed");
+        }
+    }
+    
+    /**
      * Helper method to read the request payload
      */
     private String readPayload(HttpServletRequest request) throws IOException {
