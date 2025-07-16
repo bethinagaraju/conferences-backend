@@ -3,6 +3,7 @@ package com.zn.payment.controller;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.stripe.model.Event;
+import com.stripe.model.PaymentIntent;
 import com.zn.payment.dto.CheckoutRequest;
 import com.zn.payment.dto.OpticsPaymentResponseDTO;
 import com.zn.payment.dto.NursingPaymentResponseDTO;
@@ -26,6 +28,19 @@ import com.zn.payment.nursing.service.NursingStripeService;
 import com.zn.payment.renewable.service.RenewaleStripeService;
 import com.zn.payment.optics.service.OpticsDiscountsService;
 import com.zn.payment.nursing.service.NursingDiscountsService;
+import com.zn.payment.renewable.service.RenewableDiscountsService;
+
+import com.zn.payment.optics.entity.OpticsDiscounts;
+import com.zn.payment.optics.repository.OpticsDiscountsRepository;
+import com.zn.payment.nursing.entity.NursingDiscounts;
+import com.zn.payment.nursing.repository.NursingDiscountsRepository;
+import com.zn.payment.renewable.entity.RenewableDiscounts;
+import com.zn.payment.renewable.repository.RenewableDiscountsRepository;
+
+import com.zn.payment.optics.entity.OpticsPaymentRecord;
+import com.zn.payment.nursing.entity.NursingPaymentRecord;
+import com.zn.payment.renewable.entity.RenewablePaymentRecord;
+import java.time.LocalDateTime;
 import com.zn.payment.renewable.service.RenewableDiscountsService;
 import com.zn.optics.entity.OpticsRegistrationForm;
 import com.zn.optics.entity.OpticsPricingConfig;
@@ -65,6 +80,15 @@ public class PaymentController {
     
     @Autowired
     private IOpticsPricingConfigRepository opticsPricingConfigRepository;
+    
+    @Autowired
+    private OpticsDiscountsRepository opticsDiscountsRepository;
+    
+    @Autowired
+    private NursingDiscountsRepository nursingDiscountsRepository;
+    
+    @Autowired
+    private RenewableDiscountsRepository renewableDiscountsRepository;
 
     @PostMapping("/create-checkout-session")
     public ResponseEntity<?> createCheckoutSession(@RequestBody CheckoutRequest request, @RequestParam Long pricingConfigId, HttpServletRequest httpRequest) {
@@ -883,6 +907,69 @@ public class PaymentController {
         } else {
             log.error("❌ No payment service could process payment_intent");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Payment payment_intent processing failed");
+        }
+    }
+    
+    /**
+     * Process optics discount payment intent
+     */
+    private void processOpticsDiscountPaymentIntent(PaymentIntent paymentIntent) {
+        try {
+            Optional<OpticsDiscounts> discountOpt = opticsDiscountsRepository.findByPaymentIntentId(paymentIntent.getId());
+            if (discountOpt.isPresent()) {
+                OpticsDiscounts discount = discountOpt.get();
+                discount.setPaymentIntentId(paymentIntent.getId());
+                discount.setStatus(OpticsPaymentRecord.PaymentStatus.valueOf(paymentIntent.getStatus().toUpperCase()));
+                discount.setUpdatedAt(LocalDateTime.now());
+                opticsDiscountsRepository.save(discount);
+                log.info("✅ Updated OpticsDiscounts record for PaymentIntent: {}", paymentIntent.getId());
+            } else {
+                log.warn("⚠️ OpticsDiscounts record not found for PaymentIntent: {}", paymentIntent.getId());
+            }
+        } catch (Exception e) {
+            log.error("❌ Error processing optics discount PaymentIntent: {}", e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Process nursing discount payment intent
+     */
+    private void processNursingDiscountPaymentIntent(PaymentIntent paymentIntent) {
+        try {
+            Optional<NursingDiscounts> discountOpt = nursingDiscountsRepository.findByPaymentIntentId(paymentIntent.getId());
+            if (discountOpt.isPresent()) {
+                NursingDiscounts discount = discountOpt.get();
+                discount.setPaymentIntentId(paymentIntent.getId());
+                discount.setStatus(NursingPaymentRecord.PaymentStatus.valueOf(paymentIntent.getStatus().toUpperCase()));
+                discount.setUpdatedAt(LocalDateTime.now());
+                nursingDiscountsRepository.save(discount);
+                log.info("✅ Updated NursingDiscounts record for PaymentIntent: {}", paymentIntent.getId());
+            } else {
+                log.warn("⚠️ NursingDiscounts record not found for PaymentIntent: {}", paymentIntent.getId());
+            }
+        } catch (Exception e) {
+            log.error("❌ Error processing nursing discount PaymentIntent: {}", e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Process renewable discount payment intent
+     */
+    private void processRenewableDiscountPaymentIntent(PaymentIntent paymentIntent) {
+        try {
+            Optional<RenewableDiscounts> discountOpt = renewableDiscountsRepository.findByPaymentIntentId(paymentIntent.getId());
+            if (discountOpt.isPresent()) {
+                RenewableDiscounts discount = discountOpt.get();
+                discount.setPaymentIntentId(paymentIntent.getId());
+                discount.setStatus(RenewablePaymentRecord.PaymentStatus.valueOf(paymentIntent.getStatus().toUpperCase()));
+                discount.setUpdatedAt(LocalDateTime.now());
+                renewableDiscountsRepository.save(discount);
+                log.info("✅ Updated RenewableDiscounts record for PaymentIntent: {}", paymentIntent.getId());
+            } else {
+                log.warn("⚠️ RenewableDiscounts record not found for PaymentIntent: {}", paymentIntent.getId());
+            }
+        } catch (Exception e) {
+            log.error("❌ Error processing renewable discount PaymentIntent: {}", e.getMessage(), e);
         }
     }
 }
