@@ -64,6 +64,23 @@ public class RenewableDiscountsService {
 
         try {
             Stripe.apiKey = secretKey;
+            
+            // Create metadata to identify this as a discount session
+            Map<String, String> metadata = new HashMap<>();
+            metadata.put("source", "discount-api");
+            metadata.put("paymentType", "discount-registration");
+            metadata.put("customerName", request.getName());
+            metadata.put("customerEmail", request.getCustomerEmail());
+            if (request.getPhone() != null) {
+                metadata.put("customerPhone", request.getPhone());
+            }
+            if (request.getInstituteOrUniversity() != null) {
+                metadata.put("customerInstitute", request.getInstituteOrUniversity());
+            }
+            if (request.getCountry() != null) {
+                metadata.put("customerCountry", request.getCountry());
+            }
+            
             SessionCreateParams params = SessionCreateParams.builder()
                     .addPaymentMethodType(SessionCreateParams.PaymentMethodType.CARD)
                     .addLineItem(
@@ -86,6 +103,7 @@ public class RenewableDiscountsService {
                     .setSuccessUrl(request.getSuccessUrl())
                     .setCancelUrl(request.getCancelUrl())
                     .setCustomerEmail(request.getCustomerEmail())
+                    .putAllMetadata(metadata)
                     .build();
 
             // Create the session

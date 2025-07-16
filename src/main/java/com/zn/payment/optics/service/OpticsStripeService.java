@@ -173,6 +173,7 @@ public class OpticsStripeService {
 
         // Create metadata
         Map<String, String> metadata = new HashMap<>();
+        metadata.put("source", "payment-api");
         metadata.put("productName", request.getProductName());
         if (request.getOrderReference() != null) {
             metadata.put("orderReference", request.getOrderReference());
@@ -287,6 +288,7 @@ public class OpticsStripeService {
 
         // Create metadata
         Map<String, String> metadata = new HashMap<>();
+        metadata.put("source", "payment-api");
         metadata.put("productName", request.getProductName());
         metadata.put("pricingConfigId", pricingConfig.getId().toString());
         if (request.getOrderReference() != null) {
