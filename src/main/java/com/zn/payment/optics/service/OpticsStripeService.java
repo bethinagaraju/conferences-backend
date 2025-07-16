@@ -74,7 +74,7 @@ public class OpticsStripeService {
     @Value("${stripe.api.secret.key}")
     private String secretKey;
 
-    @Value("${stripe.webhook.secret}")
+    @Value("${stripe.optics.webhook.secret}")
     private String endpointSecret;
     
     @Autowired

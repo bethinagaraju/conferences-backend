@@ -74,7 +74,7 @@ public class NursingStripeService {
     @Value("${stripe.api.secret.key}")
     private String secretKey;
 
-    @Value("${stripe.webhook.secret}")
+    @Value("${stripe.nursing.webhook.secret}")
     private String endpointSecret;
     
     @Autowired

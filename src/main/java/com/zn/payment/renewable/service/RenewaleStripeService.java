@@ -74,7 +74,7 @@ public class RenewaleStripeService {
     @Value("${stripe.api.key}")
     private String secretKey;
 
-    @Value("${stripe.webhook.secret}")
+    @Value("${stripe.renewable.webhook.secret}")
     private String endpointSecret;
     
     @Autowired
