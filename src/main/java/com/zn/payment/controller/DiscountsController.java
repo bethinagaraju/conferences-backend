@@ -179,8 +179,9 @@ public class DiscountsController {
                 log.info("✅ Discount webhook processed and discount table updated. Event type: {}", eventType);
                 return ResponseEntity.ok("Discount webhook processed and discount table updated");
             } else {
-                log.error("❌ Failed to update discount table for webhook. Event type: {}", eventType);
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update discount table for webhook");
+                log.warn("⚠️ No discount record found for webhook. Event type: {} - This might be a regular payment webhook sent to discount endpoint instead of /api/payments/webhook", eventType);
+                // Return success to avoid webhook retry loops for regular payments sent to discount endpoint
+                return ResponseEntity.ok("Webhook received but no discount record found - likely a regular payment sent to wrong endpoint");
             }
 
         } catch (Exception e) {

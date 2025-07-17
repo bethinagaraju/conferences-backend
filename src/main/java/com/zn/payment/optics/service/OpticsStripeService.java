@@ -29,9 +29,9 @@ import com.zn.optics.repository.IOpricsRegistrationFormRepository;
 import com.zn.optics.repository.IOpticsPricingConfigRepository;
 import com.zn.payment.dto.CheckoutRequest;
 import com.zn.payment.dto.OpticsPaymentResponseDTO;
-import com.zn.payment.optics.repository.OpticsDiscountsRepository;
 import com.zn.payment.optics.entity.OpticsDiscounts;
 import com.zn.payment.optics.entity.OpticsPaymentRecord;
+import com.zn.payment.optics.repository.OpticsDiscountsRepository;
 import com.zn.payment.optics.repository.OpticsPaymentRecordRepository;
 
 import lombok.extern.slf4j.Slf4j;
@@ -925,8 +925,14 @@ public class OpticsStripeService {
                 
                 // Link registration after successful payment (pass null for session since we don't have the object)
                 autoRegisterUserAfterPaymentManual(savedRecord, customerEmail);
-                
-            } else {
+                // search for existing discount and update it
+                OpticsDiscounts discount = opticsDiscountsRepository.findBySessionId(sessionId);
+                if (discount != null) {
+                    log.info("🔄 Auto-syncing discount for session: {}", sessionId);
+                    autoSyncDiscountOnPaymentUpdate(savedRecord);
+                }
+            } 
+            else {
                 log.warn("⚠️ PaymentRecord not found for session {}, creating new one from webhook data", sessionId);
                 
                 OpticsPaymentRecord newRecord = OpticsPaymentRecord.builder()
