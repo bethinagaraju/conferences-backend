@@ -210,17 +210,10 @@ public class OpticsDiscountsService {
         
         try {
             switch (eventType) {
-                case "checkout.session.completed":
-                    handleDiscountCheckoutSessionCompleted(event);
-                    break;
-                case "payment_intent.succeeded":
-                    handleDiscountPaymentIntentSucceeded(event);
-                    break;
-                case "payment_intent.payment_failed":
-                    handleDiscountPaymentIntentFailed(event);
-                    break;
-                default:
-                    System.out.println("ℹ️ Unhandled optics discount event type: " + eventType);
+                case "checkout.session.completed" -> handleDiscountCheckoutSessionCompleted(event);
+                case "payment_intent.succeeded" -> handleDiscountPaymentIntentSucceeded(event);
+                case "payment_intent.payment_failed" -> handleDiscountPaymentIntentFailed(event);
+                default -> System.out.println("ℹ️ Unhandled optics discount event type: " + eventType);
             }
         } catch (Exception e) {
             System.err.println("❌ Error processing optics discount webhook event: " + e.getMessage());
@@ -329,6 +322,11 @@ public class OpticsDiscountsService {
             return true;
         } else {
             System.out.println("[OpticsDiscountsService] No discount found for sessionId: " + sessionId);
+            // Debug: print all session IDs in the table
+            System.out.println("[OpticsDiscountsService] Existing session IDs in table:");
+            for (OpticsDiscounts d : discountsRepository.findAll()) {
+                System.out.println("  - " + d.getSessionId());
+            }
         }
         return false;
     }
@@ -355,6 +353,41 @@ public class OpticsDiscountsService {
             return true;
         } else {
             System.out.println("[OpticsDiscountsService] No discount found for paymentIntentId: " + paymentIntentId);
+            // Debug: print all payment intent IDs in the table
+            System.out.println("[OpticsDiscountsService] Existing paymentIntent IDs in table:");
+            for (OpticsDiscounts d : discountsRepository.findAll()) {
+                System.out.println("  - " + d.getPaymentIntentId());
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Find and update OpticsDiscounts record by a specific session ID, with logging.
+     */
+    public boolean findAndUpdateBySessionId(String sessionId, String newStatus) {
+        System.out.println("[OpticsDiscountsService] Searching for sessionId: " + sessionId);
+        OpticsDiscounts discount = discountsRepository.findBySessionId(sessionId);
+        if (discount != null) {
+            System.out.println("[OpticsDiscountsService] Found discount for sessionId: " + sessionId);
+            discount.setPaymentStatus(newStatus);
+            try {
+                discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.valueOf(newStatus.toUpperCase()));
+            } catch (Exception e) {
+                System.out.println("[OpticsDiscountsService] Invalid status for enum: " + newStatus + ", defaulting to PENDING");
+                discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.PENDING);
+            }
+            discount.setUpdatedAt(java.time.LocalDateTime.now());
+            discountsRepository.save(discount);
+            System.out.println("[OpticsDiscountsService] Discount updated and saved for sessionId: " + sessionId);
+            return true;
+        } else {
+            System.out.println("[OpticsDiscountsService] No discount found for sessionId: " + sessionId);
+            // Debug: print all session IDs in the table
+            System.out.println("[OpticsDiscountsService] Existing session IDs in table:");
+            for (OpticsDiscounts d : discountsRepository.findAll()) {
+                System.out.println("  - " + d.getSessionId());
+            }
         }
         return false;
     }
