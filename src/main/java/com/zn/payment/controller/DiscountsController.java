@@ -310,6 +310,24 @@ public class DiscountsController {
         return false;
     }
 
+    /**
+     * Update discount payment status by sessionId or paymentIntentId from PaymentController webhook
+     */
+    public boolean updateDiscountStatusFromPaymentWebhook(String sessionId, String paymentIntentId, String status) {
+        boolean updated = false;
+        if (sessionId != null) {
+            updated = opticsDiscountsService.updatePaymentStatusBySessionId(sessionId, status)
+                || nursingDiscountsService.updatePaymentStatusBySessionId(sessionId, status)
+                || renewableDiscountsService.updatePaymentStatusBySessionId(sessionId, status);
+        }
+        if (!updated && paymentIntentId != null) {
+            updated = opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, status)
+                || nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, status)
+                || renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, status);
+        }
+        return updated;
+    }
+
 
 
 }
