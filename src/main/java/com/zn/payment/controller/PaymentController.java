@@ -190,7 +190,6 @@ public class PaymentController {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(request.getInputStream()))) {
             payload = reader.lines().collect(Collectors.joining("\n"));
         }
-
         String sigHeader = request.getHeader("Stripe-Signature");
         log.info("Webhook payload length: {}, Signature header present: {}", payload.length(), sigHeader != null);
 
@@ -201,13 +200,17 @@ public class PaymentController {
 
         try {
             Event event = null;
+            // Try parsing event with all three services
             try {
                 event = opticsStripeService.constructWebhookEvent(payload, sigHeader);
+                log.info("✅ Event parsed successfully using optics service. Event type: {}", event != null ? event.getType() : "null");
             } catch (Exception e) {
                 try {
                     event = nursingStripeService.constructWebhookEvent(payload, sigHeader);
+                    log.info("✅ Event parsed successfully using nursing service. Event type: {}", event != null ? event.getType() : "null");
                 } catch (Exception e2) {
                     event = renewableStripeService.constructWebhookEvent(payload, sigHeader);
+                    log.info("✅ Event parsed successfully using renewable service. Event type: {}", event != null ? event.getType() : "null");
                 }
             }
 
@@ -219,6 +222,7 @@ public class PaymentController {
             String eventType = event.getType();
             log.info("🎯 Processing webhook event: {}", eventType);
 
+            // Handle discount-related events
             if ("checkout.session.completed".equals(eventType)) {
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                 if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
@@ -233,6 +237,8 @@ public class PaymentController {
                         log.warn("⚠️ No matching discount record found for sessionId/paymentIntentId: {}/{}", sessionId, paymentIntentId);
                         return ResponseEntity.ok("No matching discount record found, but webhook accepted");
                     }
+                } else {
+                    log.warn("⚠️ checkout.session.completed event did not contain a valid Session object");
                 }
             } else if ("payment_intent.succeeded".equals(eventType)) {
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
@@ -247,6 +253,8 @@ public class PaymentController {
                         log.warn("⚠️ No matching discount record found for paymentIntentId: {}", paymentIntentId);
                         return ResponseEntity.ok("No matching discount record found, but webhook accepted");
                     }
+                } else {
+                    log.warn("⚠️ payment_intent.succeeded event did not contain a valid PaymentIntent object");
                 }
             } else if ("payment_intent.payment_failed".equals(eventType)) {
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
@@ -261,11 +269,17 @@ public class PaymentController {
                         log.warn("⚠️ No matching discount record found for paymentIntentId: {}", paymentIntentId);
                         return ResponseEntity.ok("No matching discount record found, but webhook accepted");
                     }
+                } else {
+                    log.warn("⚠️ payment_intent.payment_failed event did not contain a valid PaymentIntent object");
                 }
+            } else {
+                log.info("ℹ️ Unhandled event type: {}", eventType);
+                // Accept all other events to avoid Stripe retries
+                return ResponseEntity.ok("Unhandled event type, webhook accepted");
             }
 
-            log.info("ℹ️ Unhandled event type: {}", eventType);
-            return ResponseEntity.ok("Unhandled event type, webhook accepted");
+            // Default: accept webhook if no return above
+            return ResponseEntity.ok("Webhook processed");
         } catch (Exception e) {
             log.error("❌ Error processing webhook: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing failed");
