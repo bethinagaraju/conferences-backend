@@ -87,9 +87,6 @@ public class PaymentController {
     @Autowired
     private RenewableDiscountsRepository renewableDiscountsRepository;
 
-    @Autowired
-    private DiscountsController discountsController;
-
     @PostMapping("/create-checkout-session")
     public ResponseEntity<?> createCheckoutSession(@RequestBody CheckoutRequest request, @RequestParam Long pricingConfigId, HttpServletRequest httpRequest) {
         log.info("Received request to create checkout session: {} with pricingConfigId: {}", request, pricingConfigId);
@@ -200,72 +197,134 @@ public class PaymentController {
         }
 
         try {
+            // Parse event using Optics service (all services use same Stripe event structure)
             Event event = null;
             try {
                 event = opticsStripeService.constructWebhookEvent(payload, sigHeader);
             } catch (Exception e) {
+                log.debug("Optics service couldn't parse event: {}", e.getMessage());
                 try {
                     event = nursingStripeService.constructWebhookEvent(payload, sigHeader);
                 } catch (Exception e2) {
-                    event = renewableStripeService.constructWebhookEvent(payload, sigHeader);
-                }
-            }
-
-            if (event == null) {
-                log.error("❌ Failed to parse webhook event");
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Failed to parse event");
-            }
-
-            String eventType = event.getType();
-            log.info("🎯 Processing webhook event: {}", eventType);
-
-            if ("checkout.session.completed".equals(eventType)) {
-                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
-                    com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                    String sessionId = session.getId();
-                    String paymentIntentId = session.getPaymentIntent();
-                    boolean updated = discountsController.updateDiscountStatusFromPaymentWebhook(sessionId, paymentIntentId, "COMPLETED");
-                    if (updated) {
-                        log.info("✅ Updated discount status for sessionId/paymentIntentId: {}/{}", sessionId, paymentIntentId);
-                        return ResponseEntity.ok("Discount status updated successfully");
-                    } else {
-                        log.warn("⚠️ No matching discount record found for sessionId/paymentIntentId: {}/{}", sessionId, paymentIntentId);
-                        return ResponseEntity.ok("No matching discount record found, but webhook accepted");
-                    }
-                }
-            } else if ("payment_intent.succeeded".equals(eventType)) {
-                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
-                    com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                    String paymentIntentId = paymentIntent.getId();
-                    boolean updated = discountsController.updateDiscountStatusFromPaymentWebhook(null, paymentIntentId, "SUCCEEDED");
-                    if (updated) {
-                        log.info("✅ Updated discount status for paymentIntentId: {}", paymentIntentId);
-                        return ResponseEntity.ok("Discount status updated successfully");
-                    } else {
-                        log.warn("⚠️ No matching discount record found for paymentIntentId: {}", paymentIntentId);
-                        return ResponseEntity.ok("No matching discount record found, but webhook accepted");
-                    }
-                }
-            } else if ("payment_intent.payment_failed".equals(eventType)) {
-                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
-                    com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                    String paymentIntentId = paymentIntent.getId();
-                    boolean updated = discountsController.updateDiscountStatusFromPaymentWebhook(null, paymentIntentId, "FAILED");
-                    if (updated) {
-                        log.info("✅ Updated discount status for paymentIntentId: {}", paymentIntentId);
-                        return ResponseEntity.ok("Discount status updated successfully");
-                    } else {
-                        log.warn("⚠️ No matching discount record found for paymentIntentId: {}", paymentIntentId);
-                        return ResponseEntity.ok("No matching discount record found, but webhook accepted");
+                    log.debug("Nursing service couldn't parse event: {}", e2.getMessage());
+                    try {
+                        event = renewableStripeService.constructWebhookEvent(payload, sigHeader);
+                    } catch (Exception e3) {
+                        log.error("No service could parse Stripe event: {}", e3.getMessage());
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Webhook event parse failed");
                     }
                 }
             }
 
-            log.info("ℹ️ Unhandled event type: {}", eventType);
-            return ResponseEntity.ok("Unhandled event type, webhook accepted");
+            // Enhanced webhook routing: check discount tables first
+            if (event != null) {
+                String eventType = event.getType();
+                log.info("Processing webhook event type: {}", eventType);
+
+                // Check if this is a session-related event and route accordingly
+                if (eventType.startsWith("checkout.session.") || eventType.startsWith("payment_intent.")) {
+                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+
+                    if (stripeObjectOpt.isPresent()) {
+                        com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
+
+                        // Check if it's a session object
+                        if (stripeObject instanceof com.stripe.model.checkout.Session) {
+                            com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObject;
+                            String sessionId = session.getId();
+                            log.info("Webhook session_id: {}", sessionId);
+                            // Check in discount tables first
+                            boolean updated = false;
+                            if (opticsDiscountsRepository.findBySessionId(sessionId) != null) {
+                                log.info("Session found in OpticsDiscounts, updating status...");
+                                opticsDiscountsService.processWebhookEvent(event);
+                                updated = true;
+                            } else if (nursingDiscountsRepository.findBySessionId(sessionId) != null) {
+                                log.info("Session found in NursingDiscounts, updating status...");
+                                nursingDiscountsService.processWebhookEvent(event);
+                                updated = true;
+                            } else if (renewableDiscountsRepository.findBySessionId(sessionId) != null) {
+                                log.info("Session found in RenewableDiscounts, updating status...");
+                                renewableDiscountsService.processWebhookEvent(event);
+                                updated = true;
+                            }
+                            if (updated) {
+                                return ResponseEntity.ok("Discount payment status updated in discount table");
+                            } else {
+                                log.info("Session not found in any discount table, processing as normal payment...");
+                                // Normal payment logic here (existing code)
+                                return processPaymentWebhook(event, session);
+                            }
+                        } else if (stripeObject instanceof com.stripe.model.PaymentIntent) {
+                            com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObject;
+                            String paymentIntentId = paymentIntent.getId();
+                            log.info("Webhook payment_intent_id: {}", paymentIntentId);
+                            // Check in discount tables by paymentIntentId
+                            boolean updated = false;
+                            if (opticsDiscountsRepository.findByPaymentIntentId(paymentIntentId).isPresent()) {
+                                log.info("PaymentIntent found in OpticsDiscounts, updating status...");
+                                opticsDiscountsService.processWebhookEvent(event);
+                                updated = true;
+                            } else if (nursingDiscountsRepository.findByPaymentIntentId(paymentIntentId).isPresent()) {
+                                log.info("PaymentIntent found in NursingDiscounts, updating status...");
+                                nursingDiscountsService.processWebhookEvent(event);
+                                updated = true;
+                            } else if (renewableDiscountsRepository.findByPaymentIntentId(paymentIntentId).isPresent()) {
+                                log.info("PaymentIntent found in RenewableDiscounts, updating status...");
+                                renewableDiscountsService.processWebhookEvent(event);
+                                updated = true;
+                            }
+                            if (updated) {
+                                return ResponseEntity.ok("Discount payment status updated in discount table");
+                            } else {
+                                log.info("PaymentIntent not found in any discount table, processing as normal payment...");
+                                // Normal payment logic here (existing code)
+                                return processPaymentPaymentIntent(event, paymentIntent);
+                            }
+                        }
+                    }
+                }
+
+                // Handle other event types with generic processing
+                log.info("⚠️ Unhandled or non-session event type: {} - using fallback processing", eventType);
+            }
+
+            // Fallback processing if specific handlers didn't work
+            {
+                // Fallback: process with all services as before
+                boolean processed = false;
+                try {
+                    opticsStripeService.processWebhookEvent(event);
+                    processed = true;
+                    log.info("✅ Webhook processed by Optics service. Event type: {}", event.getType());
+                } catch (Exception e) {
+                    log.debug("Optics service couldn't process webhook: {}", e.getMessage());
+                }
+                if (!processed) {
+                    try {
+                        nursingStripeService.processWebhookEvent(event);
+                        processed = true;
+                        log.info("✅ Webhook processed by Nursing service. Event type: {}", event.getType());
+                    } catch (Exception e) {
+                        log.debug("Nursing service couldn't process webhook: {}", e.getMessage());
+                    }
+                }
+                if (!processed) {
+                    try {
+                        renewableStripeService.processWebhookEvent(event);
+                        processed = true;
+                        log.info("✅ Webhook processed by Renewable service. Event type: {}", event.getType());
+                    } catch (Exception e) {
+                        log.debug("Renewable service couldn't process webhook: {}", e.getMessage());
+                    }
+                }
+                if (processed) {
+                    return ResponseEntity.ok().body("Webhook processed successfully");
+                } else {
+                    log.error("❌ No service could process the webhook");
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Webhook processing failed");
+                }
+            }
         } catch (Exception e) {
             log.error("❌ Error processing webhook: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing failed");
