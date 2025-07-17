@@ -233,52 +233,62 @@ public class PaymentController {
                             com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObject;
                             String sessionId = session.getId();
                             log.info("Webhook session_id: {}", sessionId);
-                            // Check in discount tables first
+                            log.debug("Session object: {}", session);
                             boolean updated = false;
-                            if (opticsDiscountsRepository.findBySessionId(sessionId) != null) {
-                                log.info("Session found in OpticsDiscounts, updating status...");
-                                opticsDiscountsService.processWebhookEvent(event);
+                            log.debug("Checking OpticsDiscounts for sessionId: {}", sessionId);
+                            if (opticsDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
+                                log.info("Session found and updated in OpticsDiscounts.");
                                 updated = true;
-                            } else if (nursingDiscountsRepository.findBySessionId(sessionId) != null) {
-                                log.info("Session found in NursingDiscounts, updating status...");
-                                nursingDiscountsService.processWebhookEvent(event);
-                                updated = true;
-                            } else if (renewableDiscountsRepository.findBySessionId(sessionId) != null) {
-                                log.info("Session found in RenewableDiscounts, updating status...");
-                                renewableDiscountsService.processWebhookEvent(event);
-                                updated = true;
+                            } else {
+                                log.debug("Not found in OpticsDiscounts, checking NursingDiscounts for sessionId: {}", sessionId);
+                                if (nursingDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
+                                    log.info("Session found and updated in NursingDiscounts.");
+                                    updated = true;
+                                } else {
+                                    log.debug("Not found in NursingDiscounts, checking RenewableDiscounts for sessionId: {}", sessionId);
+                                    if (renewableDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
+                                        log.info("Session found and updated in RenewableDiscounts.");
+                                        updated = true;
+                                    }
+                                }
                             }
+                            log.debug("Discount table update result for sessionId {}: {}", sessionId, updated);
                             if (updated) {
+                                log.info("Returning 200 OK for discount table update, sessionId: {}", sessionId);
                                 return ResponseEntity.ok("Discount payment status updated in discount table");
                             } else {
-                                log.info("Session not found in any discount table, processing as normal payment...");
-                                // Normal payment logic here (existing code)
+                                log.warn("SessionId {} not found in any discount table, processing as normal payment...", sessionId);
                                 return processPaymentWebhook(event, session);
                             }
                         } else if (stripeObject instanceof com.stripe.model.PaymentIntent) {
                             com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObject;
                             String paymentIntentId = paymentIntent.getId();
                             log.info("Webhook payment_intent_id: {}", paymentIntentId);
-                            // Check in discount tables by paymentIntentId
+                            log.debug("PaymentIntent object: {}", paymentIntent);
                             boolean updated = false;
-                            if (opticsDiscountsRepository.findByPaymentIntentId(paymentIntentId).isPresent()) {
-                                log.info("PaymentIntent found in OpticsDiscounts, updating status...");
-                                opticsDiscountsService.processWebhookEvent(event);
+                            log.debug("Checking OpticsDiscounts for paymentIntentId: {}", paymentIntentId);
+                            if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
+                                log.info("PaymentIntent found and updated in OpticsDiscounts.");
                                 updated = true;
-                            } else if (nursingDiscountsRepository.findByPaymentIntentId(paymentIntentId).isPresent()) {
-                                log.info("PaymentIntent found in NursingDiscounts, updating status...");
-                                nursingDiscountsService.processWebhookEvent(event);
-                                updated = true;
-                            } else if (renewableDiscountsRepository.findByPaymentIntentId(paymentIntentId).isPresent()) {
-                                log.info("PaymentIntent found in RenewableDiscounts, updating status...");
-                                renewableDiscountsService.processWebhookEvent(event);
-                                updated = true;
+                            } else {
+                                log.debug("Not found in OpticsDiscounts, checking NursingDiscounts for paymentIntentId: {}", paymentIntentId);
+                                if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
+                                    log.info("PaymentIntent found and updated in NursingDiscounts.");
+                                    updated = true;
+                                } else {
+                                    log.debug("Not found in NursingDiscounts, checking RenewableDiscounts for paymentIntentId: {}", paymentIntentId);
+                                    if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
+                                        log.info("PaymentIntent found and updated in RenewableDiscounts.");
+                                        updated = true;
+                                    }
+                                }
                             }
+                            log.debug("Discount table update result for paymentIntentId {}: {}", paymentIntentId, updated);
                             if (updated) {
+                                log.info("Returning 200 OK for discount table update, paymentIntentId: {}", paymentIntentId);
                                 return ResponseEntity.ok("Discount payment status updated in discount table");
                             } else {
-                                log.info("PaymentIntent not found in any discount table, processing as normal payment...");
-                                // Normal payment logic here (existing code)
+                                log.warn("PaymentIntentId {} not found in any discount table, processing as normal payment...", paymentIntentId);
                                 return processPaymentPaymentIntent(event, paymentIntent);
                             }
                         }
