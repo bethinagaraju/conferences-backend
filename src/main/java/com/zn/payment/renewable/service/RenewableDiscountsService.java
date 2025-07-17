@@ -312,9 +312,14 @@ public class RenewableDiscountsService {
     public boolean updatePaymentStatusBySessionId(String sessionId, String status) {
         RenewableDiscounts discount = discountsRepository.findBySessionId(sessionId);
         if (discount != null) {
+            System.out.println("[RenewableDiscountsService] Found discount for sessionId: " + sessionId);
+            System.out.println("[RenewableDiscountsService] Updating paymentStatus to: " + status);
             discount.setPaymentStatus(status);
             discountsRepository.save(discount);
+            System.out.println("[RenewableDiscountsService] Discount updated and saved for sessionId: " + sessionId);
             return true;
+        } else {
+            System.out.println("[RenewableDiscountsService] No discount found for sessionId: " + sessionId);
         }
         return false;
     }
@@ -326,9 +331,14 @@ public class RenewableDiscountsService {
         java.util.Optional<RenewableDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
         if (discountOpt.isPresent()) {
             RenewableDiscounts discount = discountOpt.get();
+            System.out.println("[RenewableDiscountsService] Found discount for paymentIntentId: " + paymentIntentId);
+            System.out.println("[RenewableDiscountsService] Updating paymentStatus to: " + status);
             discount.setPaymentStatus(status);
             discountsRepository.save(discount);
+            System.out.println("[RenewableDiscountsService] Discount updated and saved for paymentIntentId: " + paymentIntentId);
             return true;
+        } else {
+            System.out.println("[RenewableDiscountsService] No discount found for paymentIntentId: " + paymentIntentId);
         }
         return false;
     }

@@ -314,9 +314,14 @@ public class OpticsDiscountsService {
     public boolean updatePaymentStatusBySessionId(String sessionId, String status) {
         OpticsDiscounts discount = discountsRepository.findBySessionId(sessionId);
         if (discount != null) {
+            System.out.println("[OpticsDiscountsService] Found discount for sessionId: " + sessionId);
+            System.out.println("[OpticsDiscountsService] Updating paymentStatus to: " + status);
             discount.setPaymentStatus(status);
             discountsRepository.save(discount);
+            System.out.println("[OpticsDiscountsService] Discount updated and saved for sessionId: " + sessionId);
             return true;
+        } else {
+            System.out.println("[OpticsDiscountsService] No discount found for sessionId: " + sessionId);
         }
         return false;
     }
@@ -328,9 +333,14 @@ public class OpticsDiscountsService {
         java.util.Optional<OpticsDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
         if (discountOpt.isPresent()) {
             OpticsDiscounts discount = discountOpt.get();
+            System.out.println("[OpticsDiscountsService] Found discount for paymentIntentId: " + paymentIntentId);
+            System.out.println("[OpticsDiscountsService] Updating paymentStatus to: " + status);
             discount.setPaymentStatus(status);
             discountsRepository.save(discount);
+            System.out.println("[OpticsDiscountsService] Discount updated and saved for paymentIntentId: " + paymentIntentId);
             return true;
+        } else {
+            System.out.println("[OpticsDiscountsService] No discount found for paymentIntentId: " + paymentIntentId);
         }
         return false;
     }

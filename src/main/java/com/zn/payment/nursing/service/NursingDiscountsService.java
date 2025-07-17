@@ -37,9 +37,14 @@ public class NursingDiscountsService {
     public boolean updatePaymentStatusBySessionId(String sessionId, String status) {
         NursingDiscounts discount = discountsRepository.findBySessionId(sessionId);
         if (discount != null) {
+            System.out.println("[NursingDiscountsService] Found discount for sessionId: " + sessionId);
+            System.out.println("[NursingDiscountsService] Updating paymentStatus to: " + status);
             discount.setPaymentStatus(status);
             discountsRepository.save(discount);
+            System.out.println("[NursingDiscountsService] Discount updated and saved for sessionId: " + sessionId);
             return true;
+        } else {
+            System.out.println("[NursingDiscountsService] No discount found for sessionId: " + sessionId);
         }
         return false;
     }
@@ -51,9 +56,14 @@ public class NursingDiscountsService {
         java.util.Optional<NursingDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
         if (discountOpt.isPresent()) {
             NursingDiscounts discount = discountOpt.get();
+            System.out.println("[NursingDiscountsService] Found discount for paymentIntentId: " + paymentIntentId);
+            System.out.println("[NursingDiscountsService] Updating paymentStatus to: " + status);
             discount.setPaymentStatus(status);
             discountsRepository.save(discount);
+            System.out.println("[NursingDiscountsService] Discount updated and saved for paymentIntentId: " + paymentIntentId);
             return true;
+        } else {
+            System.out.println("[NursingDiscountsService] No discount found for paymentIntentId: " + paymentIntentId);
         }
         return false;
     }
