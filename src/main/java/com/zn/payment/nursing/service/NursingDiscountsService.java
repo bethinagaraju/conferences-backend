@@ -308,31 +308,4 @@ public class NursingDiscountsService {
             throw new RuntimeException("Failed to handle nursing discount payment intent failed", e);
         }
     }
-    
-    /**
-     * Update payment status in NursingDiscounts by Stripe session ID
-     */
-    public boolean updatePaymentStatusBySessionId(String sessionId, String status) {
-        NursingDiscounts discount = discountsRepository.findBySessionId(sessionId);
-        if (discount != null) {
-            discount.setPaymentStatus(status);
-            discountsRepository.save(discount);
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Update payment status in NursingDiscounts by Stripe payment intent ID
-     */
-    public boolean updatePaymentStatusByPaymentIntentId(String paymentIntentId, String status) {
-        java.util.Optional<NursingDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
-        if (discountOpt.isPresent()) {
-            NursingDiscounts discount = discountOpt.get();
-            discount.setPaymentStatus(status);
-            discountsRepository.save(discount);
-            return true;
-        }
-        return false;
-    }
 }
