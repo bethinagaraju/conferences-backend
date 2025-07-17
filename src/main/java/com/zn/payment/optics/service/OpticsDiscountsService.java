@@ -317,6 +317,13 @@ public class OpticsDiscountsService {
             System.out.println("[OpticsDiscountsService] Found discount for sessionId: " + sessionId);
             System.out.println("[OpticsDiscountsService] Updating paymentStatus to: " + status);
             discount.setPaymentStatus(status);
+            try {
+                discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.valueOf(status.toUpperCase()));
+            } catch (Exception e) {
+                System.out.println("[OpticsDiscountsService] Invalid status for enum: " + status + ", defaulting to PENDING");
+                discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.PENDING);
+            }
+            discount.setUpdatedAt(java.time.LocalDateTime.now());
             discountsRepository.save(discount);
             System.out.println("[OpticsDiscountsService] Discount updated and saved for sessionId: " + sessionId);
             return true;
@@ -336,6 +343,13 @@ public class OpticsDiscountsService {
             System.out.println("[OpticsDiscountsService] Found discount for paymentIntentId: " + paymentIntentId);
             System.out.println("[OpticsDiscountsService] Updating paymentStatus to: " + status);
             discount.setPaymentStatus(status);
+            try {
+                discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.valueOf(status.toUpperCase()));
+            } catch (Exception e) {
+                System.out.println("[OpticsDiscountsService] Invalid status for enum: " + status + ", defaulting to PENDING");
+                discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.PENDING);
+            }
+            discount.setUpdatedAt(java.time.LocalDateTime.now());
             discountsRepository.save(discount);
             System.out.println("[OpticsDiscountsService] Discount updated and saved for paymentIntentId: " + paymentIntentId);
             return true;
