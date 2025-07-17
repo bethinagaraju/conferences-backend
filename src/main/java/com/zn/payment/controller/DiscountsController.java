@@ -108,29 +108,79 @@ public class DiscountsController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Failed to parse event");
             }
 
-            // Process discount-specific events
-            boolean processed = false;
+            // Directly update discount tables based on event type
             String eventType = event.getType();
-            
             log.info("🎯 Processing discount webhook event: {}", eventType);
-            
+
+            boolean updated = false;
             if ("checkout.session.completed".equals(eventType)) {
-                processed = processDiscountCheckoutSessionCompleted(event);
+                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
+                    com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
+                    String sessionId = session.getId();
+                    log.info("[DiscountsController] Updating discount table for sessionId: {}", sessionId);
+                    if (opticsDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
+                        log.info("[DiscountsController] Updated OpticsDiscounts for sessionId: {}", sessionId);
+                        updated = true;
+                    } else if (nursingDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
+                        log.info("[DiscountsController] Updated NursingDiscounts for sessionId: {}", sessionId);
+                        updated = true;
+                    } else if (renewableDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
+                        log.info("[DiscountsController] Updated RenewableDiscounts for sessionId: {}", sessionId);
+                        updated = true;
+                    } else {
+                        log.warn("[DiscountsController] No discount record found for sessionId: {}", sessionId);
+                    }
+                }
             } else if ("payment_intent.succeeded".equals(eventType)) {
-                processed = processDiscountPaymentIntentSucceeded(event);
+                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                    com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                    String paymentIntentId = paymentIntent.getId();
+                    log.info("[DiscountsController] Updating discount table for paymentIntentId: {}", paymentIntentId);
+                    if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
+                        log.info("[DiscountsController] Updated OpticsDiscounts for paymentIntentId: {}", paymentIntentId);
+                        updated = true;
+                    } else if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
+                        log.info("[DiscountsController] Updated NursingDiscounts for paymentIntentId: {}", paymentIntentId);
+                        updated = true;
+                    } else if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
+                        log.info("[DiscountsController] Updated RenewableDiscounts for paymentIntentId: {}", paymentIntentId);
+                        updated = true;
+                    } else {
+                        log.warn("[DiscountsController] No discount record found for paymentIntentId: {}", paymentIntentId);
+                    }
+                }
             } else if ("payment_intent.payment_failed".equals(eventType)) {
-                processed = processDiscountPaymentIntentFailed(event);
+                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                    com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                    String paymentIntentId = paymentIntent.getId();
+                    log.info("[DiscountsController] Updating discount table for paymentIntentId (FAILED): {}", paymentIntentId);
+                    if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
+                        log.info("[DiscountsController] Updated OpticsDiscounts for paymentIntentId: {}", paymentIntentId);
+                        updated = true;
+                    } else if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
+                        log.info("[DiscountsController] Updated NursingDiscounts for paymentIntentId: {}", paymentIntentId);
+                        updated = true;
+                    } else if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
+                        log.info("[DiscountsController] Updated RenewableDiscounts for paymentIntentId: {}", paymentIntentId);
+                        updated = true;
+                    } else {
+                        log.warn("[DiscountsController] No discount record found for paymentIntentId: {}", paymentIntentId);
+                    }
+                }
             } else {
                 log.info("ℹ️ Unhandled discount event type: {}", eventType);
-                processed = true; // Consider unhandled events as processed to avoid errors
+                updated = true; // Consider unhandled events as processed to avoid errors
             }
 
-            if (processed) {
-                log.info("✅ Discount webhook processed successfully. Event type: {}", eventType);
-                return ResponseEntity.ok("Discount webhook processed successfully");
+            if (updated) {
+                log.info("✅ Discount webhook processed and discount table updated. Event type: {}", eventType);
+                return ResponseEntity.ok("Discount webhook processed and discount table updated");
             } else {
-                log.error("❌ Failed to process discount webhook. Event type: {}", eventType);
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to process discount webhook");
+                log.error("❌ Failed to update discount table for webhook. Event type: {}", eventType);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update discount table for webhook");
             }
 
         } catch (Exception e) {
