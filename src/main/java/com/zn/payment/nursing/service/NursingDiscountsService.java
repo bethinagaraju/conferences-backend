@@ -20,13 +20,16 @@ import com.stripe.net.Webhook;
 import com.stripe.param.checkout.SessionCreateParams;
 import com.zn.payment.dto.CreateDiscountSessionRequest;
 import com.zn.payment.nursing.entity.NursingDiscounts;
+import com.zn.payment.nursing.entity.NursingPaymentRecord;
 import com.zn.payment.nursing.entity.NursingPaymentRecord.PaymentStatus;
 import com.zn.payment.nursing.repository.NursingDiscountsRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 
 
 @Service
+@Slf4j
 public class NursingDiscountsService {
       @Value("${stripe.api.secret.key}")
     private String secretKey;
@@ -191,4 +194,118 @@ public class NursingDiscountsService {
         
     }
     
+    /**
+     * Construct webhook event from payload and signature
+     */
+    public Event constructWebhookEvent(String payload, String sigHeader) throws com.stripe.exception.SignatureVerificationException {
+        return Webhook.constructEvent(payload, sigHeader, webhookSecret);
+    }
+    
+    /**
+     * Process webhook event - updates discount status in database
+     */
+    public void processWebhookEvent(Event event) {
+        String eventType = event.getType();
+        System.out.println("🎯 Processing nursing discount webhook event: " + eventType);
+        
+        try {
+            switch (eventType) {
+                case "checkout.session.completed":
+                    handleDiscountCheckoutSessionCompleted(event);
+                    break;
+                case "payment_intent.succeeded":
+                    handleDiscountPaymentIntentSucceeded(event);
+                    break;
+                case "payment_intent.payment_failed":
+                    handleDiscountPaymentIntentFailed(event);
+                    break;
+                default:
+                    System.out.println("ℹ️ Unhandled nursing discount event type: " + eventType);
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error processing nursing discount webhook event: " + e.getMessage());
+            throw new RuntimeException("Failed to process nursing discount webhook event", e);
+        }
+    }
+    
+    private void handleDiscountCheckoutSessionCompleted(Event event) {
+        System.out.println("🎯 Handling nursing discount checkout.session.completed");
+        
+        try {
+            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
+                com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
+                String sessionId = session.getId();
+                
+                // Find the discount record by session ID
+                NursingDiscounts discount = discountsRepository.findBySessionId(sessionId);
+                if (discount != null) {
+                    discount.setStatus(NursingPaymentRecord.PaymentStatus.COMPLETED);
+                    discount.setPaymentIntentId(session.getPaymentIntent());
+                    discount.setUpdatedAt(java.time.LocalDateTime.now());
+                    discountsRepository.save(discount);
+                    System.out.println("✅ Updated NursingDiscounts status to SUCCEEDED for session: " + sessionId);
+                } else {
+                    System.out.println("⚠️ No NursingDiscounts record found for session: " + sessionId);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error handling nursing discount checkout.session.completed: " + e.getMessage());
+            throw new RuntimeException("Failed to handle nursing discount checkout session completed", e);
+        }
+    }
+    
+    private void handleDiscountPaymentIntentSucceeded(Event event) {
+        System.out.println("🎯 Handling nursing discount payment_intent.succeeded");
+        
+        try {
+            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                String paymentIntentId = paymentIntent.getId();
+                
+                // Find the discount record by payment intent ID
+                java.util.Optional<NursingDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+                if (discountOpt.isPresent()) {
+                    NursingDiscounts discount = discountOpt.get();
+                    discount.setStatus(NursingPaymentRecord.PaymentStatus.COMPLETED);
+                    discount.setUpdatedAt(java.time.LocalDateTime.now());
+                    discountsRepository.save(discount);
+                    log.info("✅ Updated NursingDiscounts status to COMPLETED for payment intent: {}", paymentIntentId);
+                } else {
+                    log.warn("⚠️ No NursingDiscounts record found for payment intent: {}", paymentIntentId);
+                }
+            }
+        } catch (Exception e) {
+            log.error("❌ Error handling nursing discount payment_intent.succeeded: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to handle nursing discount payment intent succeeded", e);
+        }
+    }
+    
+    private void handleDiscountPaymentIntentFailed(Event event) {
+        log.info("🎯 Handling nursing discount payment_intent.payment_failed");
+        
+        try {
+            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                String paymentIntentId = paymentIntent.getId();
+                
+                // Find the discount record by payment intent ID
+                java.util.Optional<NursingDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+                if (discountOpt.isPresent()) {
+                    NursingDiscounts discount = discountOpt.get();
+                    discount.setStatus(NursingPaymentRecord.PaymentStatus.FAILED);
+                    discount.setUpdatedAt(java.time.LocalDateTime.now());
+                    discountsRepository.save(discount);
+                    log.info("✅ Updated NursingDiscounts status to FAILED for payment intent: {}", paymentIntentId);
+                } else {
+                    log.warn("⚠️ No NursingDiscounts record found for payment intent: {}", paymentIntentId);
+                }
+            }
+        } catch (Exception e) {
+            log.error("❌ Error handling nursing discount payment_intent.payment_failed: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to handle nursing discount payment intent failed", e);
+        }
+    }
 }

@@ -194,4 +194,118 @@ public class OpticsDiscountsService {
         
     }
     
+    /**
+     * Construct webhook event from payload and signature
+     */
+    public Event constructWebhookEvent(String payload, String sigHeader) throws com.stripe.exception.SignatureVerificationException {
+        return Webhook.constructEvent(payload, sigHeader, webhookSecret);
+    }
+    
+    /**
+     * Process webhook event - updates discount status in database
+     */
+    public void processWebhookEvent(Event event) {
+        String eventType = event.getType();
+        System.out.println("🎯 Processing optics discount webhook event: " + eventType);
+        
+        try {
+            switch (eventType) {
+                case "checkout.session.completed":
+                    handleDiscountCheckoutSessionCompleted(event);
+                    break;
+                case "payment_intent.succeeded":
+                    handleDiscountPaymentIntentSucceeded(event);
+                    break;
+                case "payment_intent.payment_failed":
+                    handleDiscountPaymentIntentFailed(event);
+                    break;
+                default:
+                    System.out.println("ℹ️ Unhandled optics discount event type: " + eventType);
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error processing optics discount webhook event: " + e.getMessage());
+            throw new RuntimeException("Failed to process optics discount webhook event", e);
+        }
+    }
+    
+    private void handleDiscountCheckoutSessionCompleted(Event event) {
+        System.out.println("🎯 Handling optics discount checkout.session.completed");
+        
+        try {
+            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
+                com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
+                String sessionId = session.getId();
+                
+                // Find the discount record by session ID
+                OpticsDiscounts discount = discountsRepository.findBySessionId(sessionId);
+                if (discount != null) {
+                    discount.setStatus(OpticsPaymentRecord.PaymentStatus.COMPLETED);
+                    discount.setPaymentIntentId(session.getPaymentIntent());
+                    discount.setUpdatedAt(java.time.LocalDateTime.now());
+                    discountsRepository.save(discount);
+                    System.out.println("✅ Updated OpticsDiscounts status to COMPLETED for session: " + sessionId);
+                } else {
+                    System.out.println("⚠️ No OpticsDiscounts record found for session: " + sessionId);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error handling optics discount checkout.session.completed: " + e.getMessage());
+            throw new RuntimeException("Failed to handle optics discount checkout session completed", e);
+        }
+    }
+    
+    private void handleDiscountPaymentIntentSucceeded(Event event) {
+        System.out.println("🎯 Handling optics discount payment_intent.succeeded");
+        
+        try {
+            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                String paymentIntentId = paymentIntent.getId();
+                
+                // Find the discount record by payment intent ID
+                java.util.Optional<OpticsDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+                if (discountOpt.isPresent()) {
+                    OpticsDiscounts discount = discountOpt.get();
+                    discount.setStatus(OpticsPaymentRecord.PaymentStatus.COMPLETED);
+                    discount.setUpdatedAt(java.time.LocalDateTime.now());
+                    discountsRepository.save(discount);
+                    System.out.println("✅ Updated OpticsDiscounts status to COMPLETED for payment intent: " + paymentIntentId);
+                } else {
+                    System.out.println("⚠️ No OpticsDiscounts record found for payment intent: " + paymentIntentId);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error handling optics discount payment_intent.succeeded: " + e.getMessage());
+            throw new RuntimeException("Failed to handle optics discount payment intent succeeded", e);
+        }
+    }
+    
+    private void handleDiscountPaymentIntentFailed(Event event) {
+        System.out.println("🎯 Handling optics discount payment_intent.payment_failed");
+        
+        try {
+            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                String paymentIntentId = paymentIntent.getId();
+                
+                // Find the discount record by payment intent ID
+                java.util.Optional<OpticsDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+                if (discountOpt.isPresent()) {
+                    OpticsDiscounts discount = discountOpt.get();
+                    discount.setStatus(OpticsPaymentRecord.PaymentStatus.FAILED);
+                    discount.setUpdatedAt(java.time.LocalDateTime.now());
+                    discountsRepository.save(discount);
+                    System.out.println("✅ Updated OpticsDiscounts status to FAILED for payment intent: " + paymentIntentId);
+                } else {
+                    System.out.println("⚠️ No OpticsDiscounts record found for payment intent: " + paymentIntentId);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error handling optics discount payment_intent.payment_failed: " + e.getMessage());
+            throw new RuntimeException("Failed to handle optics discount payment intent failed", e);
+        }
+    }
 }
