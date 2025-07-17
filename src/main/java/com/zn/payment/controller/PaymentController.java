@@ -87,6 +87,9 @@ public class PaymentController {
     @Autowired
     private RenewableDiscountsRepository renewableDiscountsRepository;
 
+    @Autowired
+    private DiscountsController discountsController;
+
     @PostMapping("/create-checkout-session")
     public ResponseEntity<?> createCheckoutSession(@RequestBody CheckoutRequest request, @RequestParam Long pricingConfigId, HttpServletRequest httpRequest) {
         log.info("Received request to create checkout session: {} with pricingConfigId: {}", request, pricingConfigId);
@@ -216,24 +219,48 @@ public class PaymentController {
             String eventType = event.getType();
             log.info("🎯 Processing webhook event: {}", eventType);
 
-            // Payment record update logic (original behavior)
             if ("checkout.session.completed".equals(eventType)) {
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                 if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                     com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                    return processPaymentWebhook(event, session);
+                    String sessionId = session.getId();
+                    String paymentIntentId = session.getPaymentIntent();
+                    boolean updated = discountsController.updateDiscountStatusFromPaymentWebhook(sessionId, paymentIntentId, "COMPLETED");
+                    if (updated) {
+                        log.info("✅ Updated discount status for sessionId/paymentIntentId: {}/{}", sessionId, paymentIntentId);
+                        return ResponseEntity.ok("Discount status updated successfully");
+                    } else {
+                        log.warn("⚠️ No matching discount record found for sessionId/paymentIntentId: {}/{}", sessionId, paymentIntentId);
+                        return ResponseEntity.ok("No matching discount record found, but webhook accepted");
+                    }
                 }
             } else if ("payment_intent.succeeded".equals(eventType)) {
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                 if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                     com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                    return processPaymentPaymentIntent(event, paymentIntent);
+                    String paymentIntentId = paymentIntent.getId();
+                    boolean updated = discountsController.updateDiscountStatusFromPaymentWebhook(null, paymentIntentId, "SUCCEEDED");
+                    if (updated) {
+                        log.info("✅ Updated discount status for paymentIntentId: {}", paymentIntentId);
+                        return ResponseEntity.ok("Discount status updated successfully");
+                    } else {
+                        log.warn("⚠️ No matching discount record found for paymentIntentId: {}", paymentIntentId);
+                        return ResponseEntity.ok("No matching discount record found, but webhook accepted");
+                    }
                 }
             } else if ("payment_intent.payment_failed".equals(eventType)) {
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                 if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                     com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                    return processPaymentPaymentIntent(event, paymentIntent);
+                    String paymentIntentId = paymentIntent.getId();
+                    boolean updated = discountsController.updateDiscountStatusFromPaymentWebhook(null, paymentIntentId, "FAILED");
+                    if (updated) {
+                        log.info("✅ Updated discount status for paymentIntentId: {}", paymentIntentId);
+                        return ResponseEntity.ok("Discount status updated successfully");
+                    } else {
+                        log.warn("⚠️ No matching discount record found for paymentIntentId: {}", paymentIntentId);
+                        return ResponseEntity.ok("No matching discount record found, but webhook accepted");
+                    }
                 }
             }
 
