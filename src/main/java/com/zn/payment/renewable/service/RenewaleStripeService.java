@@ -25,9 +25,8 @@ import com.stripe.param.checkout.SessionCreateParams;
 import com.zn.payment.dto.CheckoutRequest;
 import com.zn.payment.dto.RenewablePaymentResponseDTO;
 import com.zn.payment.renewable.entity.RenewablePaymentRecord;
-import com.zn.payment.renewable.repository.RenewablePaymentRecordRepository;
 import com.zn.payment.renewable.repository.RenewableDiscountsRepository;
-import com.zn.payment.renewable.entity.RenewableDiscounts;
+import com.zn.payment.renewable.repository.RenewablePaymentRecordRepository;
 import com.zn.renewable.entity.RenewablePricingConfig;
 import com.zn.renewable.entity.RenewableRegistrationForm;
 import com.zn.renewable.repository.IRenewablePricingConfigRepository;
@@ -1176,14 +1175,13 @@ public class RenewaleStripeService {
      * Create new PaymentRecord from payment intent (fallback)
      */
     private void createNewPaymentRecord(com.stripe.model.PaymentIntent paymentIntent) {
-        log.info("🆕 Processing payment intent for record creation or update: {}", paymentIntent.getId());
+        log.info("🆕 Creating new PaymentRecord for payment intent: {}", paymentIntent.getId());
         
         // First check if this payment intent exists in RenewableDiscounts table
-        var discountRecord = renewableDiscountsRepository.findByPaymentIntentId(paymentIntent.getId());
+        boolean existsInDiscountsTable = renewableDiscountsRepository.findByPaymentIntentId(paymentIntent.getId()).isPresent();
         
-        if (discountRecord.isPresent()) {
-            log.info("🔄 Payment intent {} found in RenewableDiscounts table, updating discount record", paymentIntent.getId());
-            updateDiscountRecord(discountRecord.get(), paymentIntent);
+        if (existsInDiscountsTable) {
+            log.info("⚠️ Payment intent {} already exists in RenewableDiscounts table, skipping new payment record creation", paymentIntent.getId());
             return;
         }
         
@@ -1208,58 +1206,6 @@ public class RenewaleStripeService {
         
         paymentRecordRepository.save(newRecord);
         log.info("💾 ✅ Created new PaymentRecord ID: {} for payment intent: {} with paymentStatus 'paid'", newRecord.getId(), paymentIntent.getId());
-    }
-
-    /**
-     * Update discount record based on Stripe payment intent response
-     */
-    private void updateDiscountRecord(RenewableDiscounts discountRecord, com.stripe.model.PaymentIntent paymentIntent) {
-        log.info("🔄 Updating RenewableDiscounts record ID: {} with Stripe payment intent response", discountRecord.getId());
-        
-        try {
-            // Update payment status based on Stripe response
-            String stripeStatus = paymentIntent.getStatus();
-            switch (stripeStatus) {
-                case "succeeded" -> {
-                    discountRecord.setPaymentStatus("paid");
-                    discountRecord.setStatus(RenewablePaymentRecord.PaymentStatus.COMPLETED);
-                    log.info("✅ Set discount record status to COMPLETED for payment intent: {}", paymentIntent.getId());
-                }
-                case "requires_payment_method", "requires_confirmation" -> {
-                    discountRecord.setPaymentStatus("unpaid");
-                    discountRecord.setStatus(RenewablePaymentRecord.PaymentStatus.PENDING);
-                    log.info("⏳ Set discount record status to PENDING for payment intent: {}", paymentIntent.getId());
-                }
-                default -> {
-                    discountRecord.setPaymentStatus("failed");
-                    discountRecord.setStatus(RenewablePaymentRecord.PaymentStatus.FAILED);
-                    log.info("❌ Set discount record status to FAILED for payment intent: {}", paymentIntent.getId());
-                }
-            }
-            
-            // Update amount if available
-            if (paymentIntent.getAmount() != null) {
-                BigDecimal amount = BigDecimal.valueOf(paymentIntent.getAmount()).divide(BigDecimal.valueOf(100));
-                discountRecord.setAmountTotal(amount);
-                log.info("💰 Updated discount record amount to: {} EUR", amount);
-            }
-            
-            // Update currency if available
-            if (paymentIntent.getCurrency() != null) {
-                discountRecord.setCurrency(paymentIntent.getCurrency());
-                log.info("💱 Updated discount record currency to: {}", paymentIntent.getCurrency());
-            }
-            
-            // Update timestamp
-            discountRecord.setUpdatedAt(java.time.LocalDateTime.now());
-            
-            // Save the updated discount record
-            renewableDiscountsRepository.save(discountRecord);
-            log.info("💾 ✅ Successfully updated RenewableDiscounts record ID: {} based on Stripe response", discountRecord.getId());
-            
-        } catch (Exception e) {
-            log.error("❌ Error updating RenewableDiscounts record ID: {} - {}", discountRecord.getId(), e.getMessage(), e);
-        }
     }
 
     /**

@@ -976,6 +976,10 @@ public class NursingStripeService {
                 NursingPaymentRecord savedRecord = paymentRecordRepository.save(record);
                 log.info("💾 ✅ Created new NursingPaymentRecord ID: {} for session: {} with paymentStatus '{}'", 
                         savedRecord.getId(), session.getId(), savedRecord.getPaymentStatus());
+                
+                // Synchronize with discount record if exists
+                synchronizeDiscountWithPaymentData(session.getId());
+                
                 autoRegisterUserAfterPayment(savedRecord, session);
             }
         } catch (Exception e) {
@@ -1073,6 +1077,11 @@ public class NursingStripeService {
         
         paymentRecordRepository.save(record);
         log.info("💾 ✅ Successfully updated existing NursingPaymentRecord ID: {} to COMPLETED status with paymentStatus 'paid'", record.getId());
+        
+        // Synchronize with discount record if exists and session ID is available
+        if (record.getSessionId() != null) {
+            synchronizeDiscountWithPaymentData(record.getSessionId());
+        }
     }
     
     /**
@@ -1129,14 +1138,13 @@ public class NursingStripeService {
      * Create new PaymentRecord from payment intent (fallback)
      */
     private void createNewPaymentRecord(com.stripe.model.PaymentIntent paymentIntent) {
-        log.info("🆕 Processing payment intent for record creation or update: {}", paymentIntent.getId());
+        log.info("🆕 Creating new NursingPaymentRecord for payment intent: {}", paymentIntent.getId());
         
         // First check if this payment intent exists in NursingDiscounts table
-        var discountRecord = nursingDiscountsRepository.findByPaymentIntentId(paymentIntent.getId());
+        boolean existsInDiscountsTable = nursingDiscountsRepository.findByPaymentIntentId(paymentIntent.getId()).isPresent();
         
-        if (discountRecord.isPresent()) {
-            log.info("🔄 Payment intent {} found in NursingDiscounts table, updating discount record", paymentIntent.getId());
-            updateDiscountRecord(discountRecord.get(), paymentIntent);
+        if (existsInDiscountsTable) {
+            log.info("⚠️ Payment intent {} already exists in NursingDiscounts table, skipping new payment record creation", paymentIntent.getId());
             return;
         }
         
@@ -1144,7 +1152,7 @@ public class NursingStripeService {
         boolean existsInPaymentTable = paymentRecordRepository.findByPaymentIntentId(paymentIntent.getId()).isPresent();
         
         if (existsInPaymentTable) {
-            log.info("⚠️ Payment intent {} already exists in NursingPaymentRecord table, skipping new payment record creation", paymentIntent.getId());
+            log.info("⚠️ Payment intent {} already exists in NursingPaymentRecord table, skippqqqqqing new payment record creation", paymentIntent.getId());
             return;
         }
         
@@ -1161,58 +1169,6 @@ public class NursingStripeService {
         
         paymentRecordRepository.save(newRecord);
         log.info("💾 ✅ Created new NursingPaymentRecord ID: {} for payment intent: {} with paymentStatus 'paid'", newRecord.getId(), paymentIntent.getId());
-    }
-
-    /**
-     * Update discount record based on Stripe payment intent response
-     */
-    private void updateDiscountRecord(NursingDiscounts discountRecord, com.stripe.model.PaymentIntent paymentIntent) {
-        log.info("🔄 Updating NursingDiscounts record ID: {} with Stripe payment intent response", discountRecord.getId());
-        
-        try {
-            // Update payment status based on Stripe response
-            String stripeStatus = paymentIntent.getStatus();
-            switch (stripeStatus) {
-                case "succeeded" -> {
-                    discountRecord.setPaymentStatus("paid");
-                    discountRecord.setStatus(NursingPaymentRecord.PaymentStatus.COMPLETED);
-                    log.info("✅ Set discount record status to COMPLETED for payment intent: {}", paymentIntent.getId());
-                }
-                case "requires_payment_method", "requires_confirmation" -> {
-                    discountRecord.setPaymentStatus("unpaid");
-                    discountRecord.setStatus(NursingPaymentRecord.PaymentStatus.PENDING);
-                    log.info("⏳ Set discount record status to PENDING for payment intent: {}", paymentIntent.getId());
-                }
-                default -> {
-                    discountRecord.setPaymentStatus("failed");
-                    discountRecord.setStatus(NursingPaymentRecord.PaymentStatus.FAILED);
-                    log.info("❌ Set discount record status to FAILED for payment intent: {}", paymentIntent.getId());
-                }
-            }
-            
-            // Update amount if available
-            if (paymentIntent.getAmount() != null) {
-                BigDecimal amount = BigDecimal.valueOf(paymentIntent.getAmount()).divide(BigDecimal.valueOf(100));
-                discountRecord.setAmountTotal(amount);
-                log.info("💰 Updated discount record amount to: {} EUR", amount);
-            }
-            
-            // Update currency if available
-            if (paymentIntent.getCurrency() != null) {
-                discountRecord.setCurrency(paymentIntent.getCurrency());
-                log.info("💱 Updated discount record currency to: {}", paymentIntent.getCurrency());
-            }
-            
-            // Update timestamp
-            discountRecord.setUpdatedAt(java.time.LocalDateTime.now());
-            
-            // Save the updated discount record
-            nursingDiscountsRepository.save(discountRecord);
-            log.info("💾 ✅ Successfully updated NursingDiscounts record ID: {} based on Stripe response", discountRecord.getId());
-            
-        } catch (Exception e) {
-            log.error("❌ Error updating NursingDiscounts record ID: {} - {}", discountRecord.getId(), e.getMessage(), e);
-        }
     }
 
     /**
@@ -1428,6 +1384,124 @@ public NursingPaymentResponseDTO retrieveSession(String sessionId) throws Stripe
             log.error("❌ Failed to link registration form ID: {} to payment record for session: {}: {}", 
                     registrationFormId, sessionId, e.getMessage(), e);
             throw new RuntimeException("Failed to create mandatory registration-payment association: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Synchronize discount records with payment data when session IDs match
+     * Updates discount table with data from payment table based on Stripe response
+     */
+    @Transactional
+    public void synchronizeDiscountWithPaymentData(String sessionId) {
+        log.info("🔄 Synchronizing discount record with payment data for session: {}", sessionId);
+        
+        try {
+            // Find payment record by session ID
+            NursingPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(sessionId)
+                .orElse(null);
+            
+            if (paymentRecord == null) {
+                log.warn("⚠️ No payment record found for session: {}", sessionId);
+                return;
+            }
+            
+            // Find discount record by session ID
+            NursingDiscounts discountRecord = nursingDiscountsRepository.findBySessionId(sessionId);
+            
+            if (discountRecord == null) {
+                log.warn("⚠️ No discount record found for session: {}", sessionId);
+                return;
+            }
+            
+            // Update discount record with payment data
+            boolean updated = false;
+            
+            if (paymentRecord.getPaymentIntentId() != null && discountRecord.getPaymentIntentId() == null) {
+                discountRecord.setPaymentIntentId(paymentRecord.getPaymentIntentId());
+                updated = true;
+                log.info("✅ Updated payment intent ID: {}", paymentRecord.getPaymentIntentId());
+            }
+            
+            if (paymentRecord.getPaymentStatus() != null) {
+                discountRecord.setPaymentStatus(paymentRecord.getPaymentStatus());
+                updated = true;
+                log.info("✅ Updated payment status: {}", paymentRecord.getPaymentStatus());
+            }
+            
+            if (paymentRecord.getStatus() != null) {
+                // Map payment record status to discount status
+                try {
+                    discountRecord.setStatus(paymentRecord.getStatus());
+                    updated = true;
+                    log.info("✅ Updated status: {}", paymentRecord.getStatus());
+                } catch (Exception e) {
+                    log.warn("⚠️ Could not map status: {}", e.getMessage());
+                }
+            }
+            
+            if (paymentRecord.getAmountTotal() != null && discountRecord.getAmountTotal() == null) {
+                discountRecord.setAmountTotal(paymentRecord.getAmountTotal());
+                updated = true;
+                log.info("✅ Updated amount total: {}", paymentRecord.getAmountTotal());
+            }
+            
+            if (paymentRecord.getCurrency() != null && discountRecord.getCurrency() == null) {
+                discountRecord.setCurrency(paymentRecord.getCurrency());
+                updated = true;
+                log.info("✅ Updated currency: {}", paymentRecord.getCurrency());
+            }
+            
+            if (paymentRecord.getCustomerEmail() != null && discountRecord.getCustomerEmail() == null) {
+                discountRecord.setCustomerEmail(paymentRecord.getCustomerEmail());
+                updated = true;
+                log.info("✅ Updated customer email: {}", paymentRecord.getCustomerEmail());
+            }
+            
+            if (updated) {
+                discountRecord.setUpdatedAt(java.time.LocalDateTime.now());
+                nursingDiscountsRepository.save(discountRecord);
+                log.info("💾 ✅ Successfully synchronized discount record for session: {}", sessionId);
+            } else {
+                log.info("ℹ️ No updates needed for discount record with session: {}", sessionId);
+            }
+            
+        } catch (Exception e) {
+            log.error("❌ Error synchronizing discount record for session {}: {}", sessionId, e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Bulk synchronize all discount records with matching payment records
+     * Updates all discount records that have matching session IDs in payment table
+     */
+    @Transactional
+    public void bulkSynchronizeDiscountsWithPayments() {
+        log.info("🔄 Starting bulk synchronization of discount records with payment data");
+        
+        try {
+            // Find all discount records
+            List<NursingDiscounts> allDiscounts = nursingDiscountsRepository.findAll();
+            log.info("📊 Found {} discount records to check", allDiscounts.size());
+            
+            int synchronizedCount = 0;
+            
+            for (NursingDiscounts discount : allDiscounts) {
+                if (discount.getSessionId() != null) {
+                    // Check if there's a matching payment record
+                    NursingPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(discount.getSessionId())
+                        .orElse(null);
+                    
+                    if (paymentRecord != null) {
+                        synchronizeDiscountWithPaymentData(discount.getSessionId());
+                        synchronizedCount++;
+                    }
+                }
+            }
+            
+            log.info("✅ Bulk synchronization completed. Updated {} discount records", synchronizedCount);
+            
+        } catch (Exception e) {
+            log.error("❌ Error during bulk synchronization: {}", e.getMessage(), e);
         }
     }
 

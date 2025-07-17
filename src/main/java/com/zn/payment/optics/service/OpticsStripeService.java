@@ -1179,14 +1179,13 @@ public class OpticsStripeService {
      * Create new PaymentRecord from payment intent (fallback)
      */
     private void createNewPaymentRecord(com.stripe.model.PaymentIntent paymentIntent) {
-        log.info("🆕 Processing payment intent for record creation or update: {}", paymentIntent.getId());
+        log.info("🆕 Creating new PaymentRecord for payment intent: {}", paymentIntent.getId());
         
         // First check if this payment intent exists in OpticsDiscounts table
-        var discountRecord = opticsDiscountsRepository.findByPaymentIntentId(paymentIntent.getId());
+        boolean existsInDiscountsTable = opticsDiscountsRepository.findByPaymentIntentId(paymentIntent.getId()).isPresent();
         
-        if (discountRecord.isPresent()) {
-            log.info("🔄 Payment intent {} found in OpticsDiscounts table, updating discount record", paymentIntent.getId());
-            updateDiscountRecord(discountRecord.get(), paymentIntent);
+        if (existsInDiscountsTable) {
+            log.info("⚠️ Payment intent {} already exists in OpticsDiscounts table, skipping new payment record creation", paymentIntent.getId());
             return;
         }
         
@@ -1211,58 +1210,6 @@ public class OpticsStripeService {
         
         paymentRecordRepository.save(newRecord);
         log.info("💾 ✅ Created new PaymentRecord ID: {} for payment intent: {} with paymentStatus 'paid'", newRecord.getId(), paymentIntent.getId());
-    }
-
-    /**
-     * Update discount record based on Stripe payment intent response
-     */
-    private void updateDiscountRecord(OpticsDiscounts discountRecord, com.stripe.model.PaymentIntent paymentIntent) {
-        log.info("🔄 Updating OpticsDiscounts record ID: {} with Stripe payment intent response", discountRecord.getId());
-        
-        try {
-            // Update payment status based on Stripe response
-            String stripeStatus = paymentIntent.getStatus();
-            switch (stripeStatus) {
-                case "succeeded" -> {
-                    discountRecord.setPaymentStatus("paid");
-                    discountRecord.setStatus(OpticsPaymentRecord.PaymentStatus.COMPLETED);
-                    log.info("✅ Set discount record status to COMPLETED for payment intent: {}", paymentIntent.getId());
-                }
-                case "requires_payment_method", "requires_confirmation" -> {
-                    discountRecord.setPaymentStatus("unpaid");
-                    discountRecord.setStatus(OpticsPaymentRecord.PaymentStatus.PENDING);
-                    log.info("⏳ Set discount record status to PENDING for payment intent: {}", paymentIntent.getId());
-                }
-                default -> {
-                    discountRecord.setPaymentStatus("failed");
-                    discountRecord.setStatus(OpticsPaymentRecord.PaymentStatus.FAILED);
-                    log.info("❌ Set discount record status to FAILED for payment intent: {}", paymentIntent.getId());
-                }
-            }
-            
-            // Update amount if available
-            if (paymentIntent.getAmount() != null) {
-                BigDecimal amount = BigDecimal.valueOf(paymentIntent.getAmount()).divide(BigDecimal.valueOf(100));
-                discountRecord.setAmountTotal(amount);
-                log.info("💰 Updated discount record amount to: {} EUR", amount);
-            }
-            
-            // Update currency if available
-            if (paymentIntent.getCurrency() != null) {
-                discountRecord.setCurrency(paymentIntent.getCurrency());
-                log.info("💱 Updated discount record currency to: {}", paymentIntent.getCurrency());
-            }
-            
-            // Update timestamp
-            discountRecord.setUpdatedAt(java.time.LocalDateTime.now());
-            
-            // Save the updated discount record
-            opticsDiscountsRepository.save(discountRecord);
-            log.info("💾 ✅ Successfully updated OpticsDiscounts record ID: {} based on Stripe response", discountRecord.getId());
-            
-        } catch (Exception e) {
-            log.error("❌ Error updating OpticsDiscounts record ID: {} - {}", discountRecord.getId(), e.getMessage(), e);
-        }
     }
 
     /**
