@@ -305,4 +305,31 @@ public class RenewableDiscountsService {
             throw new RuntimeException("Failed to handle renewable discount payment intent failed", e);
         }
     }
+    
+    /**
+     * Update payment status in RenewableDiscounts by Stripe session ID
+     */
+    public boolean updatePaymentStatusBySessionId(String sessionId, String status) {
+        RenewableDiscounts discount = discountsRepository.findBySessionId(sessionId);
+        if (discount != null) {
+            discount.setPaymentStatus(status);
+            discountsRepository.save(discount);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Update payment status in RenewableDiscounts by Stripe payment intent ID
+     */
+    public boolean updatePaymentStatusByPaymentIntentId(String paymentIntentId, String status) {
+        java.util.Optional<RenewableDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+        if (discountOpt.isPresent()) {
+            RenewableDiscounts discount = discountOpt.get();
+            discount.setPaymentStatus(status);
+            discountsRepository.save(discount);
+            return true;
+        }
+        return false;
+    }
 }

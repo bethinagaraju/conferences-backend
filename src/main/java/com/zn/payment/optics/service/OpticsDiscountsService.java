@@ -308,4 +308,30 @@ public class OpticsDiscountsService {
             throw new RuntimeException("Failed to handle optics discount payment intent failed", e);
         }
     }
+    /**
+     * Update payment status in OpticsDiscounts by Stripe session ID
+     */
+    public boolean updatePaymentStatusBySessionId(String sessionId, String status) {
+        OpticsDiscounts discount = discountsRepository.findBySessionId(sessionId);
+        if (discount != null) {
+            discount.setPaymentStatus(status);
+            discountsRepository.save(discount);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Update payment status in OpticsDiscounts by Stripe payment intent ID
+     */
+    public boolean updatePaymentStatusByPaymentIntentId(String paymentIntentId, String status) {
+        java.util.Optional<OpticsDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+        if (discountOpt.isPresent()) {
+            OpticsDiscounts discount = discountOpt.get();
+            discount.setPaymentStatus(status);
+            discountsRepository.save(discount);
+            return true;
+        }
+        return false;
+    }
 }
