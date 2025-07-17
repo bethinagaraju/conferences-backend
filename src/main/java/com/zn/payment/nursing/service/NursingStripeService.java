@@ -28,11 +28,11 @@ import com.zn.nursing.entity.NursingRegistrationForm;
 import com.zn.nursing.repository.INursingPricingConfigRepository;
 import com.zn.nursing.repository.INursingRegistrationFormRepository;
 import com.zn.payment.dto.CheckoutRequest;
-import com.zn.payment.nursing.repository.NursingDiscountsRepository;
 import com.zn.payment.dto.NursingPaymentResponseDTO;
-import com.zn.payment.nursing.entity.NursingDiscounts;
 import com.zn.payment.nursing.entity.NursingPaymentRecord;
 import com.zn.payment.nursing.repository.NursingPaymentRecordRepository;
+import com.zn.payment.nursing.repository.NursingDiscountsRepository;
+import com.zn.payment.nursing.entity.NursingDiscounts;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -87,15 +87,85 @@ public class NursingStripeService {
 
     @Autowired
     private INursingRegistrationFormRepository registrationFormRepository;
-
+    
     @Autowired
-    private NursingDiscountsRepository nursingDiscountsRepository;
+    private NursingDiscountsRepository discountsRepository;
     
     private LocalDateTime convertToLocalDateTime(Long timestamp) {
         if (timestamp == null) return null;
         return Instant.ofEpochSecond(timestamp)
                      .atZone(US_ZONE)
                      .toLocalDateTime();
+    }
+
+    /**
+     * Auto-sync discount table when payment record is updated
+     * This implements the constraint that discount table should be updated whenever payment record changes
+     */
+    private void autoSyncDiscountOnPaymentUpdate(NursingPaymentRecord paymentRecord) {
+        if (paymentRecord == null || paymentRecord.getSessionId() == null) {
+            log.warn("⚠️ Cannot auto-sync discount: payment record or session ID is null");
+            return;
+        }
+        
+        log.info("🔄 Auto-syncing discount for payment record ID: {} with session: {}", 
+                 paymentRecord.getId(), paymentRecord.getSessionId());
+        
+        try {
+            // Find existing discount record or create new one
+            NursingDiscounts discount = discountsRepository.findBySessionId(paymentRecord.getSessionId());
+            boolean isNewDiscount = (discount == null);
+            
+            if (isNewDiscount) {
+                log.info("📝 Creating new NursingDiscounts record for session: {}", paymentRecord.getSessionId());
+                discount = new NursingDiscounts();
+                discount.setSessionId(paymentRecord.getSessionId());
+            } else {
+                log.info("📝 Updating existing NursingDiscounts ID: {} for session: {}", 
+                         discount.getId() != null ? discount.getId() : "null", paymentRecord.getSessionId());
+            }
+            
+            // Sync all fields from payment record to discount record
+            syncDiscountFields(paymentRecord, discount);
+            
+            // Save the discount record
+            NursingDiscounts savedDiscount = discountsRepository.save(discount);
+            
+            if (isNewDiscount) {
+                log.info("✅ Created new NursingDiscounts ID: {} synced with PaymentRecord ID: {}", 
+                         savedDiscount.getId(), paymentRecord.getId());
+            } else {
+                log.info("✅ Updated NursingDiscounts ID: {} synced with PaymentRecord ID: {}", 
+                         savedDiscount.getId(), paymentRecord.getId());
+            }
+            
+        } catch (Exception e) {
+            log.error("❌ Auto-sync failed for payment record ID {}: {}", 
+                      paymentRecord.getId(), e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Sync fields from payment record to discount record
+     */
+    private void syncDiscountFields(NursingPaymentRecord source, NursingDiscounts target) {
+        // Core payment fields
+        target.setCustomerEmail(source.getCustomerEmail());
+        target.setAmountTotal(source.getAmountTotal());
+        target.setCurrency(source.getCurrency());
+        target.setPaymentIntentId(source.getPaymentIntentId());
+        target.setStripeCreatedAt(source.getStripeCreatedAt());
+        target.setStripeExpiresAt(source.getStripeExpiresAt());
+        target.setPaymentStatus(source.getPaymentStatus());
+        
+        // Map PaymentRecord status to Discount status
+        if (source.getStatus() != null) {
+            target.setStatus(source.getStatus());
+        }
+        
+        log.debug("🔄 Synced fields: email={}, amount={}, currency={}, status={}", 
+                  target.getCustomerEmail(), target.getAmountTotal(), 
+                  target.getCurrency(), target.getStatus());
     }
 
     public NursingPaymentResponseDTO mapSessionToResponceDTO(Session session) {
@@ -250,6 +320,9 @@ public class NursingStripeService {
         paymentRecordRepository.save(record);
         log.info("💾 Saved NursingPaymentRecord for session: {}", session.getId());
 
+        // 🔄 Auto-sync discount table when payment record is created
+        autoSyncDiscountOnPaymentUpdate(record);
+
         return session;
 
     } catch (StripeException e) {
@@ -373,9 +446,13 @@ public class NursingStripeService {
             session.getPaymentStatus()
         );
 
+
         paymentRecordRepository.save(record);
         log.info("💾 Saved NursingPaymentRecord for session: {} with NursingPricingConfig: {}", 
                 session.getId(), pricingConfig.getId());
+
+        // 🔄 Auto-sync discount table when payment record is created
+        autoSyncDiscountOnPaymentUpdate(record);
 
         return session;
 
@@ -831,6 +908,10 @@ public class NursingStripeService {
                 NursingPaymentRecord savedRecord = paymentRecordRepository.save(paymentRecord);
                 log.info("💾 ✅ Updated NursingPaymentRecord ID: {} for session: {} to COMPLETED status with paymentStatus '{}'", 
                         savedRecord.getId(), sessionId, savedRecord.getPaymentStatus());
+                
+                // 🔄 Auto-sync discount table when payment record is updated
+                autoSyncDiscountOnPaymentUpdate(savedRecord);
+                
                 // Log the current state for debugging
                 log.info("🔍 NursingPaymentRecord state after manual update: ID={}, Status={}, PaymentStatus={}, PaymentIntentId={}", 
                         savedRecord.getId(), savedRecord.getStatus(), savedRecord.getPaymentStatus(), savedRecord.getPaymentIntentId());
@@ -895,6 +976,10 @@ public class NursingStripeService {
             // Save both entities to ensure the relationship is persisted
             registrationFormRepository.save(existingRegistration);
             paymentRecordRepository.save(paymentRecord);
+            
+            // 🔄 Auto-sync discount table when payment record is updated
+            autoSyncDiscountOnPaymentUpdate(paymentRecord);
+            
             log.info("✅ Successfully linked nursing registration form ID: {} to nursing payment record ID: {}", 
                     existingRegistration.getId(), paymentRecord.getId());
         } catch (Exception e) {
@@ -952,6 +1037,10 @@ public class NursingStripeService {
                 NursingPaymentRecord savedRecord = paymentRecordRepository.save(paymentRecord);
                 log.info("💾 ✅ Updated NursingPaymentRecord ID: {} for session: {} to COMPLETED status with paymentStatus '{}'", 
                         savedRecord.getId(), session.getId(), savedRecord.getPaymentStatus());
+                
+                // 🔄 Auto-sync discount table when payment record is updated
+                autoSyncDiscountOnPaymentUpdate(savedRecord);
+                
                 log.info("🔍 NursingPaymentRecord final state: ID={}, Status={}, PaymentStatus={}, PaymentIntentId={}, Amount={} EUR", 
                         savedRecord.getId(), savedRecord.getStatus(), savedRecord.getPaymentStatus(), 
                         savedRecord.getPaymentIntentId(), savedRecord.getAmountTotal());
@@ -976,10 +1065,6 @@ public class NursingStripeService {
                 NursingPaymentRecord savedRecord = paymentRecordRepository.save(record);
                 log.info("💾 ✅ Created new NursingPaymentRecord ID: {} for session: {} with paymentStatus '{}'", 
                         savedRecord.getId(), session.getId(), savedRecord.getPaymentStatus());
-                
-                // Synchronize with discount record if exists
-                synchronizeDiscountWithPaymentData(session.getId());
-                
                 autoRegisterUserAfterPayment(savedRecord, session);
             }
         } catch (Exception e) {
@@ -1077,11 +1162,6 @@ public class NursingStripeService {
         
         paymentRecordRepository.save(record);
         log.info("💾 ✅ Successfully updated existing NursingPaymentRecord ID: {} to COMPLETED status with paymentStatus 'paid'", record.getId());
-        
-        // Synchronize with discount record if exists and session ID is available
-        if (record.getSessionId() != null) {
-            synchronizeDiscountWithPaymentData(record.getSessionId());
-        }
     }
     
     /**
@@ -1140,23 +1220,6 @@ public class NursingStripeService {
     private void createNewPaymentRecord(com.stripe.model.PaymentIntent paymentIntent) {
         log.info("🆕 Creating new NursingPaymentRecord for payment intent: {}", paymentIntent.getId());
         
-        // First check if this payment intent exists in NursingDiscounts table
-        boolean existsInDiscountsTable = nursingDiscountsRepository.findByPaymentIntentId(paymentIntent.getId()).isPresent();
-        
-        if (existsInDiscountsTable) {
-            log.info("⚠️ Payment intent {} already exists in NursingDiscounts table, skipping new payment record creation", paymentIntent.getId());
-            return;
-        }
-        
-        // Check if payment record already exists
-        boolean existsInPaymentTable = paymentRecordRepository.findByPaymentIntentId(paymentIntent.getId()).isPresent();
-        
-        if (existsInPaymentTable) {
-            log.info("⚠️ Payment intent {} already exists in NursingPaymentRecord table, skippqqqqqing new payment record creation", paymentIntent.getId());
-            return;
-        }
-        
-        // Only create new payment record if it doesn't exist in either table
         NursingPaymentRecord newRecord = NursingPaymentRecord.builder()
                 .paymentIntentId(paymentIntent.getId())
                 .amountTotal(paymentIntent.getAmount() != null ? 
@@ -1342,6 +1405,9 @@ public NursingPaymentResponseDTO retrieveSession(String sessionId) throws Stripe
             registrationFormRepository.save(existingRegistration);
             paymentRecordRepository.save(paymentRecord);
             
+            // 🔄 Auto-sync discount table when payment record is updated
+            autoSyncDiscountOnPaymentUpdate(paymentRecord);
+            
             log.info("✅ Successfully linked registration form ID: {} to payment record ID: {}", 
                     existingRegistration.getId(), paymentRecord.getId());
             
@@ -1377,6 +1443,9 @@ public NursingPaymentResponseDTO retrieveSession(String sessionId) throws Stripe
             registrationFormRepository.save(registrationForm);
             paymentRecordRepository.save(paymentRecord);
             
+            // 🔄 Auto-sync discount table when payment record is updated
+            autoSyncDiscountOnPaymentUpdate(paymentRecord);
+            
             log.info("✅ Successfully linked registration form ID: {} to payment record ID: {} for session: {}", 
                     registrationFormId, paymentRecord.getId(), sessionId);
             
@@ -1384,124 +1453,6 @@ public NursingPaymentResponseDTO retrieveSession(String sessionId) throws Stripe
             log.error("❌ Failed to link registration form ID: {} to payment record for session: {}: {}", 
                     registrationFormId, sessionId, e.getMessage(), e);
             throw new RuntimeException("Failed to create mandatory registration-payment association: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Synchronize discount records with payment data when session IDs match
-     * Updates discount table with data from payment table based on Stripe response
-     */
-    @Transactional
-    public void synchronizeDiscountWithPaymentData(String sessionId) {
-        log.info("🔄 Synchronizing discount record with payment data for session: {}", sessionId);
-        
-        try {
-            // Find payment record by session ID
-            NursingPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(sessionId)
-                .orElse(null);
-            
-            if (paymentRecord == null) {
-                log.warn("⚠️ No payment record found for session: {}", sessionId);
-                return;
-            }
-            
-            // Find discount record by session ID
-            NursingDiscounts discountRecord = nursingDiscountsRepository.findBySessionId(sessionId);
-            
-            if (discountRecord == null) {
-                log.warn("⚠️ No discount record found for session: {}", sessionId);
-                return;
-            }
-            
-            // Update discount record with payment data
-            boolean updated = false;
-            
-            if (paymentRecord.getPaymentIntentId() != null && discountRecord.getPaymentIntentId() == null) {
-                discountRecord.setPaymentIntentId(paymentRecord.getPaymentIntentId());
-                updated = true;
-                log.info("✅ Updated payment intent ID: {}", paymentRecord.getPaymentIntentId());
-            }
-            
-            if (paymentRecord.getPaymentStatus() != null) {
-                discountRecord.setPaymentStatus(paymentRecord.getPaymentStatus());
-                updated = true;
-                log.info("✅ Updated payment status: {}", paymentRecord.getPaymentStatus());
-            }
-            
-            if (paymentRecord.getStatus() != null) {
-                // Map payment record status to discount status
-                try {
-                    discountRecord.setStatus(paymentRecord.getStatus());
-                    updated = true;
-                    log.info("✅ Updated status: {}", paymentRecord.getStatus());
-                } catch (Exception e) {
-                    log.warn("⚠️ Could not map status: {}", e.getMessage());
-                }
-            }
-            
-            if (paymentRecord.getAmountTotal() != null && discountRecord.getAmountTotal() == null) {
-                discountRecord.setAmountTotal(paymentRecord.getAmountTotal());
-                updated = true;
-                log.info("✅ Updated amount total: {}", paymentRecord.getAmountTotal());
-            }
-            
-            if (paymentRecord.getCurrency() != null && discountRecord.getCurrency() == null) {
-                discountRecord.setCurrency(paymentRecord.getCurrency());
-                updated = true;
-                log.info("✅ Updated currency: {}", paymentRecord.getCurrency());
-            }
-            
-            if (paymentRecord.getCustomerEmail() != null && discountRecord.getCustomerEmail() == null) {
-                discountRecord.setCustomerEmail(paymentRecord.getCustomerEmail());
-                updated = true;
-                log.info("✅ Updated customer email: {}", paymentRecord.getCustomerEmail());
-            }
-            
-            if (updated) {
-                discountRecord.setUpdatedAt(java.time.LocalDateTime.now());
-                nursingDiscountsRepository.save(discountRecord);
-                log.info("💾 ✅ Successfully synchronized discount record for session: {}", sessionId);
-            } else {
-                log.info("ℹ️ No updates needed for discount record with session: {}", sessionId);
-            }
-            
-        } catch (Exception e) {
-            log.error("❌ Error synchronizing discount record for session {}: {}", sessionId, e.getMessage(), e);
-        }
-    }
-    
-    /**
-     * Bulk synchronize all discount records with matching payment records
-     * Updates all discount records that have matching session IDs in payment table
-     */
-    @Transactional
-    public void bulkSynchronizeDiscountsWithPayments() {
-        log.info("🔄 Starting bulk synchronization of discount records with payment data");
-        
-        try {
-            // Find all discount records
-            List<NursingDiscounts> allDiscounts = nursingDiscountsRepository.findAll();
-            log.info("📊 Found {} discount records to check", allDiscounts.size());
-            
-            int synchronizedCount = 0;
-            
-            for (NursingDiscounts discount : allDiscounts) {
-                if (discount.getSessionId() != null) {
-                    // Check if there's a matching payment record
-                    NursingPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(discount.getSessionId())
-                        .orElse(null);
-                    
-                    if (paymentRecord != null) {
-                        synchronizeDiscountWithPaymentData(discount.getSessionId());
-                        synchronizedCount++;
-                    }
-                }
-            }
-            
-            log.info("✅ Bulk synchronization completed. Updated {} discount records", synchronizedCount);
-            
-        } catch (Exception e) {
-            log.error("❌ Error during bulk synchronization: {}", e.getMessage(), e);
         }
     }
 

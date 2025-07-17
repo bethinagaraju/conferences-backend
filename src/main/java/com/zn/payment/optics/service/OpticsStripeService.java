@@ -99,6 +99,76 @@ public class OpticsStripeService {
                      .toLocalDateTime();
     }
 
+    /**
+     * Auto-sync discount table when payment record is updated
+     * This implements the constraint that discount table should be updated whenever payment record changes
+     */
+    private void autoSyncDiscountOnPaymentUpdate(OpticsPaymentRecord paymentRecord) {
+        if (paymentRecord == null || paymentRecord.getSessionId() == null) {
+            log.warn("⚠️ Cannot auto-sync discount: payment record or session ID is null");
+            return;
+        }
+        
+        log.info("🔄 Auto-syncing discount for payment record ID: {} with session: {}", 
+                 paymentRecord.getId(), paymentRecord.getSessionId());
+        
+        try {
+            // Find existing discount record or create new one
+            OpticsDiscounts discount = opticsDiscountsRepository.findBySessionId(paymentRecord.getSessionId());
+            boolean isNewDiscount = (discount == null);
+            
+            if (isNewDiscount) {
+                log.info("📝 Creating new OpticsDiscounts record for session: {}", paymentRecord.getSessionId());
+                discount = new OpticsDiscounts();
+                discount.setSessionId(paymentRecord.getSessionId());
+            } else {
+                log.info("📝 Updating existing OpticsDiscounts ID: {} for session: {}", 
+                         discount.getId() != null ? discount.getId() : "null", paymentRecord.getSessionId());
+            }
+            
+            // Sync all fields from payment record to discount record
+            syncDiscountFields(paymentRecord, discount);
+            
+            // Save the discount record
+            OpticsDiscounts savedDiscount = opticsDiscountsRepository.save(discount);
+            
+            if (isNewDiscount) {
+                log.info("✅ Created new OpticsDiscounts ID: {} synced with PaymentRecord ID: {}", 
+                         savedDiscount.getId(), paymentRecord.getId());
+            } else {
+                log.info("✅ Updated OpticsDiscounts ID: {} synced with PaymentRecord ID: {}", 
+                         savedDiscount.getId(), paymentRecord.getId());
+            }
+            
+        } catch (Exception e) {
+            log.error("❌ Auto-sync failed for payment record ID {}: {}", 
+                      paymentRecord.getId(), e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Sync fields from payment record to discount record
+     */
+    private void syncDiscountFields(OpticsPaymentRecord source, OpticsDiscounts target) {
+        // Core payment fields
+        target.setCustomerEmail(source.getCustomerEmail());
+        target.setAmountTotal(source.getAmountTotal());
+        target.setCurrency(source.getCurrency());
+        target.setPaymentIntentId(source.getPaymentIntentId());
+        target.setStripeCreatedAt(source.getStripeCreatedAt());
+        target.setStripeExpiresAt(source.getStripeExpiresAt());
+        target.setPaymentStatus(source.getPaymentStatus());
+        
+        // Map PaymentRecord status to Discount status
+        if (source.getStatus() != null) {
+            target.setStatus(source.getStatus());
+        }
+        
+        log.debug("🔄 Synced fields: email={}, amount={}, currency={}, status={}", 
+                  target.getCustomerEmail(), target.getAmountTotal(), 
+                  target.getCurrency(), target.getStatus());
+    }
+
     public OpticsPaymentResponseDTO mapSessionToResponceDTO(Session session) {
         OpticsPaymentResponseDTO responseDTO = new OpticsPaymentResponseDTO();
         responseDTO.setSessionId(session.getId());
@@ -252,6 +322,9 @@ public class OpticsStripeService {
         paymentRecordRepository.save(record);
         log.info("💾 Saved PaymentRecord for session: {}", session.getId());
 
+        // 🔄 Auto-sync discount table when payment record is created
+        autoSyncDiscountOnPaymentUpdate(record);
+
         return session;
 
     } catch (StripeException e) {
@@ -379,6 +452,9 @@ public class OpticsStripeService {
             paymentRecordRepository.save(record);
             log.info("💾 Saved PaymentRecord for session: {} with pricing config: {}", 
                     session.getId(), pricingConfig.getId());
+
+            // 🔄 Auto-sync discount table when payment record is created
+            autoSyncDiscountOnPaymentUpdate(record);
 
             return session;
 
@@ -840,6 +916,9 @@ public class OpticsStripeService {
                 log.info("💾 ✅ Updated PaymentRecord ID: {} for session: {} to COMPLETED status with paymentStatus '{}'", 
                         savedRecord.getId(), sessionId, savedRecord.getPaymentStatus());
                 
+                // 🔄 Auto-sync discount table when payment record is updated
+                autoSyncDiscountOnPaymentUpdate(savedRecord);
+                
                 // Log the current state for debugging
                 log.info("🔍 PaymentRecord state after manual update: ID={}, Status={}, PaymentStatus={}, PaymentIntentId={}", 
                         savedRecord.getId(), savedRecord.getStatus(), savedRecord.getPaymentStatus(), savedRecord.getPaymentIntentId());
@@ -992,6 +1071,9 @@ public class OpticsStripeService {
                 OpticsPaymentRecord savedRecord = paymentRecordRepository.save(paymentRecord);
                 log.info("💾 ✅ Updated PaymentRecord ID: {} for session: {} to COMPLETED status with paymentStatus '{}'", 
                         savedRecord.getId(), session.getId(), savedRecord.getPaymentStatus());
+                
+                // 🔄 Auto-sync discount table when payment record is updated
+                autoSyncDiscountOnPaymentUpdate(savedRecord);
                 
                 // Log the final state for debugging
                 log.info("🔍 PaymentRecord final state: ID={}, Status={}, PaymentStatus={}, PaymentIntentId={}, Amount={} EUR", 
