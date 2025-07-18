@@ -315,18 +315,18 @@ public class PaymentController {
                 if (successUrl != null && !successUrl.isEmpty()) {
                     String urlLower = successUrl.toLowerCase();
                     log.info("[Webhook Debug] Found success_url: {}", successUrl);
-                    if (urlLower.contains("optics")) {
-                        log.info("[Webhook Debug] Routing to Optics service by success_url match.");
+                    if (urlLower.contains("globallopmeet.com") || urlLower.contains("optics")) {
+                        log.info("[Webhook Debug] Routing to Optics service by success_url/domain match.");
                         opticsStripeService.processWebhookEvent(event);
                         log.info("✅ Webhook processed by Optics service by success_url: {}", successUrl);
                         return ResponseEntity.ok().body("Webhook processed by Optics service by success_url: " + successUrl);
-                    } else if (urlLower.contains("nursing")) {
-                        log.info("[Webhook Debug] Routing to Nursing service by success_url match.");
+                    } else if (urlLower.contains("nursingmeet2026.com") || urlLower.contains("nursing")) {
+                        log.info("[Webhook Debug] Routing to Nursing service by success_url/domain match.");
                         nursingStripeService.processWebhookEvent(event);
                         log.info("✅ Webhook processed by Nursing service by success_url: {}", successUrl);
                         return ResponseEntity.ok().body("Webhook processed by Nursing service by success_url: " + successUrl);
-                    } else if (urlLower.contains("renewable")) {
-                        log.info("[Webhook Debug] Routing to Renewable service by success_url match.");
+                    } else if (urlLower.contains("globalrenewablemeet.com") || urlLower.contains("renewable")) {
+                        log.info("[Webhook Debug] Routing to Renewable service by success_url/domain match.");
                         renewableStripeService.processWebhookEvent(event);
                         log.info("✅ Webhook processed by Renewable service by success_url: {}", successUrl);
                         return ResponseEntity.ok().body("Webhook processed by Renewable service by success_url: " + successUrl);
