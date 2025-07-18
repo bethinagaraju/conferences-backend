@@ -29,10 +29,10 @@ import com.zn.nursing.repository.INursingPricingConfigRepository;
 import com.zn.nursing.repository.INursingRegistrationFormRepository;
 import com.zn.payment.dto.CheckoutRequest;
 import com.zn.payment.dto.NursingPaymentResponseDTO;
-import com.zn.payment.nursing.entity.NursingPaymentRecord;
-import com.zn.payment.nursing.repository.NursingPaymentRecordRepository;
-import com.zn.payment.nursing.repository.NursingDiscountsRepository;
 import com.zn.payment.nursing.entity.NursingDiscounts;
+import com.zn.payment.nursing.entity.NursingPaymentRecord;
+import com.zn.payment.nursing.repository.NursingDiscountsRepository;
+import com.zn.payment.nursing.repository.NursingPaymentRecordRepository;
 
 import lombok.extern.slf4j.Slf4j;
 

@@ -33,6 +33,8 @@ import com.zn.payment.optics.entity.OpticsDiscounts;
 import com.zn.payment.optics.entity.OpticsPaymentRecord;
 import com.zn.payment.optics.repository.OpticsDiscountsRepository;
 import com.zn.payment.optics.repository.OpticsPaymentRecordRepository;
+// import optional class
+
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -450,8 +452,19 @@ public class OpticsStripeService {
             );
 
             paymentRecordRepository.save(record);
+            // update the status in DiscountsRepository
             log.info("💾 Saved PaymentRecord for session: {} with pricing config: {}", 
                     session.getId(), pricingConfig.getId());
+            // write the code to update the discount table
+            OpticsDiscounts discount = opticsDiscountsRepository.findBySessionId(session.getId());
+            if (discount != null) {
+                discount.setPaymentStatus(record.getPaymentStatus());
+                discount.setStatus(record.getStatus());
+                opticsDiscountsRepository.save(discount);
+            }
+            log.info("💾 Saved PaymentRecord for session: {} with pricing config: {}", 
+                    session.getId(), pricingConfig.getId());
+             
 
             // 🔄 Auto-sync discount table when payment record is created
             autoSyncDiscountOnPaymentUpdate(record);
@@ -917,7 +930,17 @@ public class OpticsStripeService {
                         savedRecord.getId(), sessionId, savedRecord.getPaymentStatus());
                 
                 // 🔄 Auto-sync discount table when payment record is updated
-                autoSyncDiscountOnPaymentUpdate(savedRecord);
+                // manually updated the same record in discount table
+
+                OpticsDiscounts discount = opticsDiscountsRepository.findBySessionId(sessionId);
+                if (discount != null) {
+                    log.info("🔄 Syncing discount record for session: {}", sessionId);
+                    discount.setPaymentStatus(savedRecord.getPaymentStatus());
+                    discount.setAmountTotal(savedRecord.getAmountTotal());
+                    discount.setStatus(savedRecord.getStatus());
+                    opticsDiscountsRepository.save(discount);
+                }
+                               autoSyncDiscountOnPaymentUpdate(savedRecord);
                 
                 // Log the current state for debugging
                 log.info("🔍 PaymentRecord state after manual update: ID={}, Status={}, PaymentStatus={}, PaymentIntentId={}", 
@@ -925,12 +948,6 @@ public class OpticsStripeService {
                 
                 // Link registration after successful payment (pass null for session since we don't have the object)
                 autoRegisterUserAfterPaymentManual(savedRecord, customerEmail);
-                // search for existing discount and update it
-                OpticsDiscounts discount = opticsDiscountsRepository.findBySessionId(sessionId);
-                if (discount != null) {
-                    log.info("🔄 Auto-syncing discount for session: {}", sessionId);
-                    autoSyncDiscountOnPaymentUpdate(savedRecord);
-                }
             } 
             else {
                 log.warn("⚠️ PaymentRecord not found for session {}, creating new one from webhook data", sessionId);
