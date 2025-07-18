@@ -222,30 +222,41 @@ public class PaymentController {
 
                 // Route based on product name in session metadata if present
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                boolean productNameMatched = false;
                 if (stripeObjectOpt.isPresent()) {
                     com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
+                    log.info("[Webhook Debug] Stripe object class: {}", stripeObject.getClass().getName());
                     String productName = null;
+                    java.util.Map<String, String> metadata = null;
                     if (stripeObject instanceof com.stripe.model.checkout.Session session) {
-                        if (session.getMetadata() != null) {
-                            productName = session.getMetadata().get("productName");
+                        metadata = session.getMetadata();
+                        log.info("[Webhook Debug] Session metadata: {}", metadata);
+                        if (metadata != null) {
+                            productName = metadata.get("productName");
                         }
                     } else if (stripeObject instanceof com.stripe.model.PaymentIntent paymentIntent) {
-                        if (paymentIntent.getMetadata() != null) {
-                            productName = paymentIntent.getMetadata().get("productName");
+                        metadata = paymentIntent.getMetadata();
+                        log.info("[Webhook Debug] PaymentIntent metadata: {}", metadata);
+                        if (metadata != null) {
+                            productName = metadata.get("productName");
                         }
+                    } else {
+                        log.warn("[Webhook Debug] Stripe object is not Session or PaymentIntent: {}", stripeObject.getClass().getName());
                     }
+                    log.info("[Webhook Debug] Extracted productName: {}", productName);
                     if (productName != null) {
                         String productNameUpper = productName.toUpperCase();
                         if (productNameUpper.contains("OPTICS")) {
+                            log.info("[Webhook Debug] Routing to Optics service by productName match.");
                             opticsStripeService.processWebhookEvent(event);
                             log.info("✅ Webhook processed by Optics service by productName: {}", productName);
                             return ResponseEntity.ok().body("Webhook processed by Optics service by productName: " + productName);
                         } else if (productNameUpper.contains("NURSING")) {
+                            log.info("[Webhook Debug] Routing to Nursing service by productName match.");
                             nursingStripeService.processWebhookEvent(event);
                             log.info("✅ Webhook processed by Nursing service by productName: {}", productName);
                             return ResponseEntity.ok().body("Webhook processed by Nursing service by productName: " + productName);
                         } else if (productNameUpper.contains("RENEWABLE")) {
+                            log.info("[Webhook Debug] Routing to Renewable service by productName match.");
                             renewableStripeService.processWebhookEvent(event);
                             log.info("✅ Webhook processed by Renewable service by productName: {}", productName);
                             return ResponseEntity.ok().body("Webhook processed by Renewable service by productName: " + productName);
@@ -254,7 +265,7 @@ public class PaymentController {
                             log.warn("Product name '{}' did not match any site, using fallback processing.", productName);
                         }
                     } else {
-                        log.warn("Product name not found in metadata, using fallback processing.");
+                        log.warn("Product name not found in metadata, using fallback processing. Metadata: {}", metadata);
                     }
                 } else {
                     log.warn("Stripe object not present in event, using fallback processing.");
