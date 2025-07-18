@@ -222,6 +222,7 @@ public class PaymentController {
 
                 // Route based on product name in session metadata if present
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                boolean productNameMatched = false;
                 if (stripeObjectOpt.isPresent()) {
                     com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
                     String productName = null;
@@ -248,11 +249,16 @@ public class PaymentController {
                             renewableStripeService.processWebhookEvent(event);
                             log.info("✅ Webhook processed by Renewable service by productName: {}", productName);
                             return ResponseEntity.ok().body("Webhook processed by Renewable service by productName: " + productName);
+                        } else {
+                            // Product name present but does not match any known site
+                            log.warn("Product name '{}' did not match any site, using fallback processing.", productName);
                         }
+                    } else {
+                        log.warn("Product name not found in metadata, using fallback processing.");
                     }
+                } else {
+                    log.warn("Stripe object not present in event, using fallback processing.");
                 }
-                // If product name is not present or doesn't match, fallback to old logic
-                log.warn("Product name not found or did not match any site, using fallback processing.");
                 // Fallback: process with all services as before
                 boolean processed = false;
                 try {
