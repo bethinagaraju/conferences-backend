@@ -151,6 +151,47 @@ public class DiscountsController {
                         updated = true;
                     } else {
                         log.warn("[DiscountsController] No discount record found for paymentIntentId: {}", paymentIntentId);
+                        // Try to find discount record by session ID if payment intent has one
+                        if (paymentIntent.getMetadata() != null && paymentIntent.getMetadata().containsKey("sessionId")) {
+                            String associatedSessionId = paymentIntent.getMetadata().get("sessionId");
+                            log.info("[DiscountsController] Trying to update discount table using sessionId from payment intent metadata: {}", associatedSessionId);
+                            if (opticsDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "SUCCEEDED")) {
+                                log.info("[DiscountsController] Updated OpticsDiscounts for sessionId: {} (from payment intent metadata)", associatedSessionId);
+                                updated = true;
+                            } else if (nursingDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "SUCCEEDED")) {
+                                log.info("[DiscountsController] Updated NursingDiscounts for sessionId: {} (from payment intent metadata)", associatedSessionId);
+                                updated = true;
+                            } else if (renewableDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "SUCCEEDED")) {
+                                log.info("[DiscountsController] Updated RenewableDiscounts for sessionId: {} (from payment intent metadata)", associatedSessionId);
+                                updated = true;
+                            } else {
+                                log.warn("[DiscountsController] No discount record found for sessionId: {} (from payment intent metadata)", associatedSessionId);
+                            }
+                        } else {
+                            log.info("[DiscountsController] No sessionId metadata found in payment intent, trying to force update via services");
+                            // Try to process the payment intent event directly through each service
+                            try {
+                                opticsDiscountsService.processWebhookEvent(event);
+                                log.info("[DiscountsController] Processed payment intent with OpticsDiscountsService: {}", paymentIntentId);
+                                updated = true;
+                            } catch (Exception e) {
+                                log.debug("OpticsDiscountsService couldn't process payment intent {}: {}", paymentIntentId, e.getMessage());
+                                try {
+                                    nursingDiscountsService.processWebhookEvent(event);
+                                    log.info("[DiscountsController] Processed payment intent with NursingDiscountsService: {}", paymentIntentId);
+                                    updated = true;
+                                } catch (Exception e2) {
+                                    log.debug("NursingDiscountsService couldn't process payment intent {}: {}", paymentIntentId, e2.getMessage());
+                                    try {
+                                        renewableDiscountsService.processWebhookEvent(event);
+                                        log.info("[DiscountsController] Processed payment intent with RenewableDiscountsService: {}", paymentIntentId);
+                                        updated = true;
+                                    } catch (Exception e3) {
+                                        log.debug("RenewableDiscountsService couldn't process payment intent {}: {}", paymentIntentId, e3.getMessage());
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             } else if ("payment_intent.payment_failed".equals(eventType)) {
@@ -170,6 +211,47 @@ public class DiscountsController {
                         updated = true;
                     } else {
                         log.warn("[DiscountsController] No discount record found for paymentIntentId: {}", paymentIntentId);
+                        // Try to find discount record by session ID if payment intent has one
+                        if (paymentIntent.getMetadata() != null && paymentIntent.getMetadata().containsKey("sessionId")) {
+                            String associatedSessionId = paymentIntent.getMetadata().get("sessionId");
+                            log.info("[DiscountsController] Trying to update discount table using sessionId from payment intent metadata: {}", associatedSessionId);
+                            if (opticsDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "FAILED")) {
+                                log.info("[DiscountsController] Updated OpticsDiscounts for sessionId: {} (from payment intent metadata)", associatedSessionId);
+                                updated = true;
+                            } else if (nursingDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "FAILED")) {
+                                log.info("[DiscountsController] Updated NursingDiscounts for sessionId: {} (from payment intent metadata)", associatedSessionId);
+                                updated = true;
+                            } else if (renewableDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "FAILED")) {
+                                log.info("[DiscountsController] Updated RenewableDiscounts for sessionId: {} (from payment intent metadata)", associatedSessionId);
+                                updated = true;
+                            } else {
+                                log.warn("[DiscountsController] No discount record found for sessionId: {} (from payment intent metadata)", associatedSessionId);
+                            }
+                        } else {
+                            log.info("[DiscountsController] No sessionId metadata found in payment intent, trying to force update via services");
+                            // Try to process the payment intent event directly through each service
+                            try {
+                                opticsDiscountsService.processWebhookEvent(event);
+                                log.info("[DiscountsController] Processed payment intent failure with OpticsDiscountsService: {}", paymentIntentId);
+                                updated = true;
+                            } catch (Exception e) {
+                                log.debug("OpticsDiscountsService couldn't process payment intent failure {}: {}", paymentIntentId, e.getMessage());
+                                try {
+                                    nursingDiscountsService.processWebhookEvent(event);
+                                    log.info("[DiscountsController] Processed payment intent failure with NursingDiscountsService: {}", paymentIntentId);
+                                    updated = true;
+                                } catch (Exception e2) {
+                                    log.debug("NursingDiscountsService couldn't process payment intent failure {}: {}", paymentIntentId, e2.getMessage());
+                                    try {
+                                        renewableDiscountsService.processWebhookEvent(event);
+                                        log.info("[DiscountsController] Processed payment intent failure with RenewableDiscountsService: {}", paymentIntentId);
+                                        updated = true;
+                                    } catch (Exception e3) {
+                                        log.debug("RenewableDiscountsService couldn't process payment intent failure {}: {}", paymentIntentId, e3.getMessage());
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             } else {
