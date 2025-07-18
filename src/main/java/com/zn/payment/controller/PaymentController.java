@@ -217,7 +217,52 @@ public class PaymentController {
             }
 
             if (event != null) {
-                // Try to extract success_url from event JSON
+                // 1. Try to extract productName from event metadata
+                String productName = null;
+                try {
+                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                    if (stripeObjectOpt.isPresent()) {
+                        com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
+                        java.util.Map<String, String> metadata = null;
+                        try {
+                            java.lang.reflect.Method getMetadata = stripeObject.getClass().getMethod("getMetadata");
+                            Object metaObj = getMetadata.invoke(stripeObject);
+                            if (metaObj instanceof java.util.Map) {
+                                metadata = (java.util.Map<String, String>) metaObj;
+                                if (metadata != null) {
+                                    productName = metadata.get("productName");
+                                }
+                            }
+                        } catch (Exception ex) {
+                            log.warn("[Webhook Debug] Could not extract metadata from object: {}", ex.getMessage());
+                        }
+                    }
+                } catch (Exception ex) {
+                    log.warn("[Webhook Debug] Could not extract productName from event: {}", ex.getMessage());
+                }
+                if (productName != null && !productName.isEmpty()) {
+                    String productNameUpper = productName.toUpperCase();
+                    log.info("[Webhook Debug] Found productName: {}", productName);
+                    if (productNameUpper.contains("OPTICS")) {
+                        log.info("[Webhook Debug] Routing to Optics service by productName match.");
+                        opticsStripeService.processWebhookEvent(event);
+                        log.info("✅ Webhook processed by Optics service by productName: {}", productName);
+                        return ResponseEntity.ok().body("Webhook processed by Optics service by productName: " + productName);
+                    } else if (productNameUpper.contains("NURSING")) {
+                        log.info("[Webhook Debug] Routing to Nursing service by productName match.");
+                        nursingStripeService.processWebhookEvent(event);
+                        log.info("✅ Webhook processed by Nursing service by productName: {}", productName);
+                        return ResponseEntity.ok().body("Webhook processed by Nursing service by productName: " + productName);
+                    } else if (productNameUpper.contains("RENEWABLE")) {
+                        log.info("[Webhook Debug] Routing to Renewable service by productName match.");
+                        renewableStripeService.processWebhookEvent(event);
+                        log.info("✅ Webhook processed by Renewable service by productName: {}", productName);
+                        return ResponseEntity.ok().body("Webhook processed by Renewable service by productName: " + productName);
+                    } else {
+                        log.warn("[Webhook Debug] productName '{}' did not match any site, will try success_url fallback.", productName);
+                    }
+                }
+                // 2. Fallback: Try to extract success_url from event JSON
                 String successUrl = null;
                 try {
                     com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -249,8 +294,8 @@ public class PaymentController {
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("success_url did not match any site. No table updated.");
                     }
                 } else {
-                    log.error("[Webhook Debug] No success_url found in event. No table will be updated.");
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No success_url found. No table updated.");
+                    log.error("[Webhook Debug] No productName or success_url found in event. No table will be updated.");
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No productName or success_url found. No table updated.");
                 }
             }
             // If event is null
