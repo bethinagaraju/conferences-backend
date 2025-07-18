@@ -51,30 +51,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/payment")
 @Slf4j
 public class PaymentController {
-    @Autowired
-    private IOpticsPricingConfigRepository opticsPricingConfigRepository;
-
-    @Autowired
-    private IOpricsRegistrationFormRepository opticsRegistrationFormRepository;
-    // --- Discount repositories ---
-    @Autowired
-    private OpticsDiscountsRepository opticsDiscountsRepository;
-
-    @Autowired
-    private NursingDiscountsRepository nursingDiscountsRepository;
-
-    @Autowired
-    private RenewableDiscountsRepository renewableDiscountsRepository;
-
-    // --- Discount services ---
-    @Autowired
-    private OpticsDiscountsService opticsDiscountsService;
-
-    @Autowired
-    private NursingDiscountsService nursingDiscountsService;
-
-    @Autowired
-    private RenewableDiscountsService renewableDiscountsService;
 
     @Autowired
     private OpticsStripeService opticsStripeService;
@@ -87,22 +63,133 @@ public class PaymentController {
 
     // Discount services
     @Autowired
+    private OpticsDiscountsService opticsDiscountsService;
+    
+    @Autowired
+    private NursingDiscountsService nursingDiscountsService;
+    
+    @Autowired
+    private RenewableDiscountsService renewableDiscountsService;
+
+    // Optics repositories
+    @Autowired
+    private IOpricsRegistrationFormRepository opticsRegistrationFormRepository;
+    
+    @Autowired
+    private IOpticsPricingConfigRepository opticsPricingConfigRepository;
+    
+    @Autowired
+    private OpticsDiscountsRepository opticsDiscountsRepository;
+    
+    @Autowired
+    private NursingDiscountsRepository nursingDiscountsRepository;
+    
+    @Autowired
+    private RenewableDiscountsRepository renewableDiscountsRepository;
+
+    @PostMapping("/create-checkout-session")
+    public ResponseEntity<?> createCheckoutSession(@RequestBody CheckoutRequest request, @RequestParam Long pricingConfigId, HttpServletRequest httpRequest) {
+        log.info("Received request to create checkout session: {} with pricingConfigId: {}", request, pricingConfigId);
+        
+        String origin = httpRequest.getHeader("Origin");
+        if (origin == null) {
+            origin = httpRequest.getHeader("Referer");
+        }
+        
+        if (origin == null) {
+            log.error("Origin or Referer header is missing");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(createErrorResponse("origin_or_referer_missing"));
+        }
+        
+        // Route to appropriate service based on domain and handle internally
+        if (origin.contains("globallopmeet.com")) {
+            log.info("Processing Optics checkout for domain: {}", origin);
+            return handleOpticsCheckout(request, pricingConfigId);
+        } else if (origin.contains("nursingmeet2026.com")) {
+            log.info("Processing Nursing checkout for domain: {}", origin);
+            return handleNursingCheckout(request, pricingConfigId);
+        } else if (origin.contains("globalrenewablemeet.com")) {
+            log.info("Processing Renewable checkout for domain: {}", origin);
+            return handleRenewableCheckout(request, pricingConfigId);
+        } else {
+            log.error("Unknown frontend domain: {}", origin);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(createErrorResponse("unknown_frontend_domain"));
+        }
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getCheckoutSession(@PathVariable String id, HttpServletRequest httpRequest) {
+        log.info("Retrieving checkout session with ID: {}", id);
+        
+        String origin = httpRequest.getHeader("Origin");
+        if (origin == null) {
+            origin = httpRequest.getHeader("Referer");
+        }
+        
+        try {
+            if (origin != null && origin.contains("globallopmeet.com")) {
+                OpticsPaymentResponseDTO responseDTO = opticsStripeService.retrieveSession(id);
+                return ResponseEntity.ok(responseDTO);
+            } else if (origin != null && origin.contains("nursingmeet2026.com")) {
+                NursingPaymentResponseDTO responseDTO = nursingStripeService.retrieveSession(id);
+                return ResponseEntity.ok(responseDTO);
+            } else if (origin != null && origin.contains("globalrenewablemeet.com")) {
+                RenewablePaymentResponseDTO responseDTO = renewableStripeService.retrieveSession(id);
+                return ResponseEntity.ok(responseDTO);
+            } else {
+                log.error("Unknown or missing domain origin: {}", origin);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(createErrorResponse("unknown_domain_or_missing_origin"));
+            }
+        } catch (Exception e) {
+            log.error("Error retrieving checkout session: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("failed"));
+        }
+    }
+    @PostMapping("/{id}/expire")
+    public ResponseEntity<?> expireSession(@PathVariable String id, HttpServletRequest httpRequest) {
+        log.info("Expiring checkout session with ID: {}", id);
+        
+        String origin = httpRequest.getHeader("Origin");
+        if (origin == null) {
+            origin = httpRequest.getHeader("Referer");
+        }
+        
+        try {
+            if (origin != null && origin.contains("globallopmeet.com")) {
+                OpticsPaymentResponseDTO responseDTO = opticsStripeService.expireSession(id);
+                return ResponseEntity.ok(responseDTO);
+            } else if (origin != null && origin.contains("nursingmeet2026.com")) {
+                NursingPaymentResponseDTO responseDTO = nursingStripeService.expireSession(id);
+                return ResponseEntity.ok(responseDTO);
+            } else if (origin != null && origin.contains("globalrenewablemeet.com")) {
+                RenewablePaymentResponseDTO responseDTO = renewableStripeService.expireSession(id);
+                return ResponseEntity.ok(responseDTO);
+            } else {
+                log.error("Unknown or missing domain origin: {}", origin);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(createErrorResponse("unknown_domain_or_missing_origin"));
+            }
+        } catch (Exception e) {
+            log.error("Error expiring checkout session: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("failed"));
+        }
+    }
+
     @PostMapping("/webhook")
     public ResponseEntity<String> handleWebhook(HttpServletRequest request) throws IOException {
         log.info("Received webhook request");
-        // --- Diagnostic: Log full incoming payload for debugging ---
-        String rawPayload = null;
         String payload;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(request.getInputStream()))) {
             payload = reader.lines().collect(Collectors.joining("\n"));
-            rawPayload = payload;
         }
 
         String sigHeader = request.getHeader("Stripe-Signature");
         log.info("Webhook payload length: {}, Signature header present: {}", payload.length(), sigHeader != null);
-
-        // Log the raw payload for debugging
-        log.info("[Webhook Debug] Raw Stripe event payload: {}", rawPayload);
 
         if (sigHeader == null || sigHeader.isEmpty()) {
             log.error("⚠️ Missing Stripe-Signature header");
@@ -130,114 +217,40 @@ public class PaymentController {
             }
 
             if (event != null) {
-                String eventType = event.getType();
-                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                if (stripeObjectOpt.isPresent()) {
-                    com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
-                    log.info("[Webhook Debug] Stripe object class: {}", stripeObject.getClass().getName());
-                    String productName = null;
-                    java.util.Map<String, String> metadata = null;
-                    // Handle both event types
-                    if ("checkout.session.completed".equals(eventType) && stripeObject instanceof com.stripe.model.checkout.Session session) {
-                        metadata = session.getMetadata();
-                        log.info("[Webhook Debug] Session metadata: {}", metadata);
-                        if (metadata != null) {
-                            productName = metadata.get("productName");
-                        }
-                    } else if ("payment_intent.succeeded".equals(eventType) && stripeObject instanceof com.stripe.model.PaymentIntent paymentIntent) {
-                        metadata = paymentIntent.getMetadata();
-                        log.info("[Webhook Debug] PaymentIntent metadata: {}", metadata);
-                        if (metadata != null) {
-                            productName = metadata.get("productName");
-                        }
-                    } else {
-                        // Try to extract productName from any metadata if present
-                        try {
-                            java.lang.reflect.Method getMetadata = stripeObject.getClass().getMethod("getMetadata");
-                            Object metaObj = getMetadata.invoke(stripeObject);
-                            if (metaObj instanceof java.util.Map) {
-                                metadata = (java.util.Map<String, String>) metaObj;
-                                log.info("[Webhook Debug] Generic metadata: {}", metadata);
-                                if (metadata != null) {
-                                    productName = metadata.get("productName");
-                                }
-                            }
-                        } catch (Exception ex) {
-                            log.warn("[Webhook Debug] Could not extract metadata from object: {}", ex.getMessage());
-                        }
-                    }
-                    log.info("[Webhook Debug] Extracted productName: {}", productName);
-                    if (productName != null) {
-                        String productNameUpper = productName.toUpperCase();
-                        if (productNameUpper.contains("OPTICS")) {
-                            log.info("[Webhook Debug] Routing to Optics service by productName match.");
-                            opticsStripeService.processWebhookEvent(event);
-                            log.info("✅ Webhook processed by Optics service by productName: {}", productName);
-                            return ResponseEntity.ok().body("Webhook processed by Optics service by productName: " + productName);
-                        } else if (productNameUpper.contains("NURSING")) {
-                            log.info("[Webhook Debug] Routing to Nursing service by productName match.");
-                            nursingStripeService.processWebhookEvent(event);
-                            log.info("✅ Webhook processed by Nursing service by productName: {}", productName);
-                            return ResponseEntity.ok().body("Webhook processed by Nursing service by productName: " + productName);
-                        } else if (productNameUpper.contains("RENEWABLE")) {
-                            log.info("[Webhook Debug] Routing to Renewable service by productName match.");
-                            renewableStripeService.processWebhookEvent(event);
-                            log.info("✅ Webhook processed by Renewable service by productName: {}", productName);
-                            return ResponseEntity.ok().body("Webhook processed by Renewable service by productName: " + productName);
-                        } else {
-                            // Product name present but does not match any known site
-                            log.warn("[Webhook Debug] Product name '{}' did not match any site, using fallback processing.", productName);
-                        }
-                    } else {
-                        log.warn("[Webhook Debug] Product name not found in metadata, using fallback processing. Metadata: {}", metadata);
-                    }
-                } else {
-                    log.warn("[Webhook Debug] Stripe object not present in event, using fallback processing. Event type: {}", eventType);
-                    log.info("[Webhook Debug] Event JSON: {}", event.toJson());
-                }
-                // Fallback: try to extract productName from event JSON if not already found
-                log.info("[Webhook Debug] Entering fallback/default routing block.");
-                String fallbackProductName = null;
+                // Try to extract success_url from event JSON
+                String successUrl = null;
                 try {
-                    String eventJson = event.toJson();
-                    // Try to extract productName from event JSON (very basic, not robust)
-                    int idx = eventJson.indexOf("productName");
-                    if (idx != -1) {
-                        int start = eventJson.indexOf(':', idx) + 1;
-                        int end = eventJson.indexOf(',', start);
-                        if (end == -1) end = eventJson.indexOf('}', start);
-                        if (start != -1 && end != -1) {
-                            fallbackProductName = eventJson.substring(start, end).replaceAll("[\"{}]", "").trim();
-                        }
-                    }
+                    com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(event.toJson());
+                    successUrl = findSuccessUrlRecursive(root);
                 } catch (Exception ex) {
-                    log.warn("[Webhook Debug] Could not extract productName from event JSON in fallback: {}", ex.getMessage());
+                    log.warn("[Webhook Debug] Could not extract success_url from event JSON: {}", ex.getMessage());
                 }
-                String effectiveProductName = fallbackProductName;
-                if (effectiveProductName != null && !effectiveProductName.isEmpty()) {
-                    String productNameUpper = effectiveProductName.toUpperCase();
-                    if (productNameUpper.contains("OPTICS")) {
-                        log.info("[Webhook Debug] Fallback: Routing to Optics service by productName match.");
+                if (successUrl != null && !successUrl.isEmpty()) {
+                    String urlLower = successUrl.toLowerCase();
+                    log.info("[Webhook Debug] Found success_url: {}", successUrl);
+                    if (urlLower.contains("optics")) {
+                        log.info("[Webhook Debug] Routing to Optics service by success_url match.");
                         opticsStripeService.processWebhookEvent(event);
-                        log.info("✅ Webhook processed by Optics service (fallback) by productName: {}", effectiveProductName);
-                        return ResponseEntity.ok().body("Webhook processed by Optics service (fallback) by productName: " + effectiveProductName);
-                    } else if (productNameUpper.contains("NURSING")) {
-                        log.info("[Webhook Debug] Fallback: Routing to Nursing service by productName match.");
+                        log.info("✅ Webhook processed by Optics service by success_url: {}", successUrl);
+                        return ResponseEntity.ok().body("Webhook processed by Optics service by success_url: " + successUrl);
+                    } else if (urlLower.contains("nursing")) {
+                        log.info("[Webhook Debug] Routing to Nursing service by success_url match.");
                         nursingStripeService.processWebhookEvent(event);
-                        log.info("✅ Webhook processed by Nursing service (fallback) by productName: {}", effectiveProductName);
-                        return ResponseEntity.ok().body("Webhook processed by Nursing service (fallback) by productName: " + effectiveProductName);
-                    } else if (productNameUpper.contains("RENEWABLE")) {
-                        log.info("[Webhook Debug] Fallback: Routing to Renewable service by productName match.");
+                        log.info("✅ Webhook processed by Nursing service by success_url: {}", successUrl);
+                        return ResponseEntity.ok().body("Webhook processed by Nursing service by success_url: " + successUrl);
+                    } else if (urlLower.contains("renewable")) {
+                        log.info("[Webhook Debug] Routing to Renewable service by success_url match.");
                         renewableStripeService.processWebhookEvent(event);
-                        log.info("✅ Webhook processed by Renewable service (fallback) by productName: {}", effectiveProductName);
-                        return ResponseEntity.ok().body("Webhook processed by Renewable service (fallback) by productName: " + effectiveProductName);
+                        log.info("✅ Webhook processed by Renewable service by success_url: {}", successUrl);
+                        return ResponseEntity.ok().body("Webhook processed by Renewable service by success_url: " + successUrl);
                     } else {
-                        log.warn("[Webhook Debug] Fallback: Product name '{}' did not match any site. No table will be updated.", effectiveProductName);
-                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Fallback: Product name did not match any site. No table updated.");
+                        log.warn("[Webhook Debug] success_url '{}' did not match any site. No table will be updated.", successUrl);
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("success_url did not match any site. No table updated.");
                     }
                 } else {
-                    log.error("[Webhook Debug] Fallback: No productName found in event. No table will be updated.");
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Fallback: No productName found. No table updated.");
+                    log.error("[Webhook Debug] No success_url found in event. No table will be updated.");
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No success_url found. No table updated.");
                 }
             }
             // If event is null
@@ -248,7 +261,27 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing failed");
         }
     }
-// ...existing code...
+    // Helper: Recursively search for success_url in a JsonNode
+    private String findSuccessUrlRecursive(com.fasterxml.jackson.databind.JsonNode node) {
+        if (node == null) return null;
+        if (node.isObject()) {
+            java.util.Iterator<java.util.Map.Entry<String, com.fasterxml.jackson.databind.JsonNode>> fields = node.fields();
+            while (fields.hasNext()) {
+                java.util.Map.Entry<String, com.fasterxml.jackson.databind.JsonNode> entry = fields.next();
+                if ("success_url".equals(entry.getKey()) && entry.getValue().isTextual()) {
+                    return entry.getValue().asText();
+                }
+                String found = findSuccessUrlRecursive(entry.getValue());
+                if (found != null) return found;
+            }
+        } else if (node.isArray()) {
+            for (com.fasterxml.jackson.databind.JsonNode item : node) {
+                String found = findSuccessUrlRecursive(item);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
     
     /**
      * Alternative webhook endpoints for domain-specific processing
