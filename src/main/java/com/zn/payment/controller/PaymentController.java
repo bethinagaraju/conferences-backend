@@ -51,6 +51,30 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/payment")
 @Slf4j
 public class PaymentController {
+    @Autowired
+    private IOpticsPricingConfigRepository opticsPricingConfigRepository;
+
+    @Autowired
+    private IOpricsRegistrationFormRepository opticsRegistrationFormRepository;
+    // --- Discount repositories ---
+    @Autowired
+    private OpticsDiscountsRepository opticsDiscountsRepository;
+
+    @Autowired
+    private NursingDiscountsRepository nursingDiscountsRepository;
+
+    @Autowired
+    private RenewableDiscountsRepository renewableDiscountsRepository;
+
+    // --- Discount services ---
+    @Autowired
+    private OpticsDiscountsService opticsDiscountsService;
+
+    @Autowired
+    private NursingDiscountsService nursingDiscountsService;
+
+    @Autowired
+    private RenewableDiscountsService renewableDiscountsService;
 
     @Autowired
     private OpticsStripeService opticsStripeService;
@@ -63,133 +87,22 @@ public class PaymentController {
 
     // Discount services
     @Autowired
-    private OpticsDiscountsService opticsDiscountsService;
-    
-    @Autowired
-    private NursingDiscountsService nursingDiscountsService;
-    
-    @Autowired
-    private RenewableDiscountsService renewableDiscountsService;
-
-    // Optics repositories
-    @Autowired
-    private IOpricsRegistrationFormRepository opticsRegistrationFormRepository;
-    
-    @Autowired
-    private IOpticsPricingConfigRepository opticsPricingConfigRepository;
-    
-    @Autowired
-    private OpticsDiscountsRepository opticsDiscountsRepository;
-    
-    @Autowired
-    private NursingDiscountsRepository nursingDiscountsRepository;
-    
-    @Autowired
-    private RenewableDiscountsRepository renewableDiscountsRepository;
-
-    @PostMapping("/create-checkout-session")
-    public ResponseEntity<?> createCheckoutSession(@RequestBody CheckoutRequest request, @RequestParam Long pricingConfigId, HttpServletRequest httpRequest) {
-        log.info("Received request to create checkout session: {} with pricingConfigId: {}", request, pricingConfigId);
-        
-        String origin = httpRequest.getHeader("Origin");
-        if (origin == null) {
-            origin = httpRequest.getHeader("Referer");
-        }
-        
-        if (origin == null) {
-            log.error("Origin or Referer header is missing");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(createErrorResponse("origin_or_referer_missing"));
-        }
-        
-        // Route to appropriate service based on domain and handle internally
-        if (origin.contains("globallopmeet.com")) {
-            log.info("Processing Optics checkout for domain: {}", origin);
-            return handleOpticsCheckout(request, pricingConfigId);
-        } else if (origin.contains("nursingmeet2026.com")) {
-            log.info("Processing Nursing checkout for domain: {}", origin);
-            return handleNursingCheckout(request, pricingConfigId);
-        } else if (origin.contains("globalrenewablemeet.com")) {
-            log.info("Processing Renewable checkout for domain: {}", origin);
-            return handleRenewableCheckout(request, pricingConfigId);
-        } else {
-            log.error("Unknown frontend domain: {}", origin);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(createErrorResponse("unknown_frontend_domain"));
-        }
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<?> getCheckoutSession(@PathVariable String id, HttpServletRequest httpRequest) {
-        log.info("Retrieving checkout session with ID: {}", id);
-        
-        String origin = httpRequest.getHeader("Origin");
-        if (origin == null) {
-            origin = httpRequest.getHeader("Referer");
-        }
-        
-        try {
-            if (origin != null && origin.contains("globallopmeet.com")) {
-                OpticsPaymentResponseDTO responseDTO = opticsStripeService.retrieveSession(id);
-                return ResponseEntity.ok(responseDTO);
-            } else if (origin != null && origin.contains("nursingmeet2026.com")) {
-                NursingPaymentResponseDTO responseDTO = nursingStripeService.retrieveSession(id);
-                return ResponseEntity.ok(responseDTO);
-            } else if (origin != null && origin.contains("globalrenewablemeet.com")) {
-                RenewablePaymentResponseDTO responseDTO = renewableStripeService.retrieveSession(id);
-                return ResponseEntity.ok(responseDTO);
-            } else {
-                log.error("Unknown or missing domain origin: {}", origin);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(createErrorResponse("unknown_domain_or_missing_origin"));
-            }
-        } catch (Exception e) {
-            log.error("Error retrieving checkout session: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(createErrorResponse("failed"));
-        }
-    }
-    @PostMapping("/{id}/expire")
-    public ResponseEntity<?> expireSession(@PathVariable String id, HttpServletRequest httpRequest) {
-        log.info("Expiring checkout session with ID: {}", id);
-        
-        String origin = httpRequest.getHeader("Origin");
-        if (origin == null) {
-            origin = httpRequest.getHeader("Referer");
-        }
-        
-        try {
-            if (origin != null && origin.contains("globallopmeet.com")) {
-                OpticsPaymentResponseDTO responseDTO = opticsStripeService.expireSession(id);
-                return ResponseEntity.ok(responseDTO);
-            } else if (origin != null && origin.contains("nursingmeet2026.com")) {
-                NursingPaymentResponseDTO responseDTO = nursingStripeService.expireSession(id);
-                return ResponseEntity.ok(responseDTO);
-            } else if (origin != null && origin.contains("globalrenewablemeet.com")) {
-                RenewablePaymentResponseDTO responseDTO = renewableStripeService.expireSession(id);
-                return ResponseEntity.ok(responseDTO);
-            } else {
-                log.error("Unknown or missing domain origin: {}", origin);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(createErrorResponse("unknown_domain_or_missing_origin"));
-            }
-        } catch (Exception e) {
-            log.error("Error expiring checkout session: {}", e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(createErrorResponse("failed"));
-        }
-    }
-
     @PostMapping("/webhook")
     public ResponseEntity<String> handleWebhook(HttpServletRequest request) throws IOException {
         log.info("Received webhook request");
+        // --- Diagnostic: Log full incoming payload for debugging ---
+        String rawPayload = null;
         String payload;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(request.getInputStream()))) {
             payload = reader.lines().collect(Collectors.joining("\n"));
+            rawPayload = payload;
         }
 
         String sigHeader = request.getHeader("Stripe-Signature");
         log.info("Webhook payload length: {}, Signature header present: {}", payload.length(), sigHeader != null);
+
+        // Log the raw payload for debugging
+        log.info("[Webhook Debug] Raw Stripe event payload: {}", rawPayload);
 
         if (sigHeader == null || sigHeader.isEmpty()) {
             log.error("⚠️ Missing Stripe-Signature header");
@@ -218,7 +131,6 @@ public class PaymentController {
 
             if (event != null) {
                 String eventType = event.getType();
-                log.info("[Webhook Debug] Processing webhook event type: {}", eventType);
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                 if (stripeObjectOpt.isPresent()) {
                     com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
@@ -274,20 +186,22 @@ public class PaymentController {
                             return ResponseEntity.ok().body("Webhook processed by Renewable service by productName: " + productName);
                         } else {
                             // Product name present but does not match any known site
-                            log.warn("Product name '{}' did not match any site, using fallback processing.", productName);
+                            log.warn("[Webhook Debug] Product name '{}' did not match any site, using fallback processing.", productName);
                         }
                     } else {
-                        log.warn("Product name not found in metadata, using fallback processing. Metadata: {}", metadata);
+                        log.warn("[Webhook Debug] Product name not found in metadata, using fallback processing. Metadata: {}", metadata);
                     }
                 } else {
-                    log.warn("Stripe object not present in event, using fallback processing.");
+                    log.warn("[Webhook Debug] Stripe object not present in event, using fallback processing. Event type: {}", eventType);
+                    log.info("[Webhook Debug] Event JSON: {}", event.toJson());
                 }
                 // Fallback: process with all services as before
+                log.info("[Webhook Debug] Entering fallback/default routing block.");
                 boolean processed = false;
                 try {
                     opticsStripeService.processWebhookEvent(event);
                     processed = true;
-                    log.info("✅ Webhook processed by Optics service. Event type: {}", event.getType());
+                    log.info("✅ Webhook processed by Optics service (default). Event type: {}", event.getType());
                 } catch (Exception e) {
                     log.debug("Optics service couldn't process webhook: {}", e.getMessage());
                 }
@@ -295,7 +209,7 @@ public class PaymentController {
                     try {
                         nursingStripeService.processWebhookEvent(event);
                         processed = true;
-                        log.info("✅ Webhook processed by Nursing service. Event type: {}", event.getType());
+                        log.info("✅ Webhook processed by Nursing service (default). Event type: {}", event.getType());
                     } catch (Exception e) {
                         log.debug("Nursing service couldn't process webhook: {}", e.getMessage());
                     }
@@ -304,7 +218,7 @@ public class PaymentController {
                     try {
                         renewableStripeService.processWebhookEvent(event);
                         processed = true;
-                        log.info("✅ Webhook processed by Renewable service. Event type: {}", event.getType());
+                        log.info("✅ Webhook processed by Renewable service (default). Event type: {}", event.getType());
                     } catch (Exception e) {
                         log.debug("Renewable service couldn't process webhook: {}", e.getMessage());
                     }
@@ -324,6 +238,7 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing failed");
         }
     }
+// ...existing code...
     
     /**
      * Alternative webhook endpoints for domain-specific processing
