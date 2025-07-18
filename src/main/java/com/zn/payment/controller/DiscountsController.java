@@ -19,6 +19,7 @@ import com.zn.payment.dto.CreateDiscountSessionRequest;
 import com.zn.payment.nursing.service.NursingDiscountsService;
 import com.zn.payment.optics.service.OpticsDiscountsService;
 import com.zn.payment.renewable.service.RenewableDiscountsService;
+import com.zn.payment.service.PaymentSyncService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,9 @@ public class DiscountsController {
     
     @Autowired
     private RenewableDiscountsService renewableDiscountsService;
+    
+    @Autowired
+    private PaymentSyncService paymentSyncService;
 
     // create stripe session
     @PostMapping("/create-session")
@@ -121,17 +125,54 @@ public class DiscountsController {
                     com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
                     sessionId = session.getId();
                     log.info("[DiscountsController] Updating discount table for sessionId: {}", sessionId);
+                    
+                    // Try to update discount records for each service
                     if (opticsDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
                         log.info("[DiscountsController] Updated OpticsDiscounts for sessionId: {}", sessionId);
                         updated = true;
+                        
+                        // Also sync via database function to ensure consistency
+                        try {
+                            String syncResult = paymentSyncService.syncOpticsPaymentBySessionId(sessionId);
+                            log.info("[DiscountsController] Optics database sync result: {}", syncResult);
+                        } catch (Exception e) {
+                            log.error("[DiscountsController] Optics database sync failed: {}", e.getMessage());
+                        }
+                        
                     } else if (nursingDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
                         log.info("[DiscountsController] Updated NursingDiscounts for sessionId: {}", sessionId);
                         updated = true;
+                        
+                        // Also sync via database function to ensure consistency
+                        try {
+                            String syncResult = paymentSyncService.syncNursingPaymentBySessionId(sessionId);
+                            log.info("[DiscountsController] Nursing database sync result: {}", syncResult);
+                        } catch (Exception e) {
+                            log.error("[DiscountsController] Nursing database sync failed: {}", e.getMessage());
+                        }
+                        
                     } else if (renewableDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
                         log.info("[DiscountsController] Updated RenewableDiscounts for sessionId: {}", sessionId);
                         updated = true;
+                        
+                        // Also sync via database function to ensure consistency
+                        try {
+                            String syncResult = paymentSyncService.syncRenewablePaymentBySessionId(sessionId);
+                            log.info("[DiscountsController] Renewable database sync result: {}", syncResult);
+                        } catch (Exception e) {
+                            log.error("[DiscountsController] Renewable database sync failed: {}", e.getMessage());
+                        }
+                        
                     } else {
                         log.warn("[DiscountsController] No discount record found for sessionId: {}", sessionId);
+                        
+                        // Try to sync all services in case payment records exist without discount records
+                        try {
+                            PaymentSyncService.SyncResult syncResult = paymentSyncService.syncAllServicesBySessionId(sessionId);
+                            log.info("[DiscountsController] All-services sync result: {}", syncResult);
+                        } catch (Exception e) {
+                            log.error("[DiscountsController] All-services sync failed: {}", e.getMessage());
+                        }
                     }
                 }
             } else if ("payment_intent.succeeded".equals(eventType)) {

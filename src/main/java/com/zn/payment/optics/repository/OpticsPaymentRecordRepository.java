@@ -53,4 +53,8 @@ public interface OpticsPaymentRecordRepository extends JpaRepository<OpticsPayme
     List<OpticsPaymentRecord> findAllByOrderByCreatedAtDesc();
     
     List<OpticsPaymentRecord> findByCreatedAtAfterOrderByCreatedAtDesc(LocalDateTime createdAt);
+    
+    // Database sync function - synchronizes discount records with payment records
+    @Query(value = "SELECT sync_optics_by_session_id(:sessionId)", nativeQuery = true)
+    String syncOpticsBySessionId(@Param("sessionId") String sessionId);
 }

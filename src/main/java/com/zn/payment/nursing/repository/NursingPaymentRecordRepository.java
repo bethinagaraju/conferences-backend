@@ -53,4 +53,8 @@ public interface NursingPaymentRecordRepository extends JpaRepository<NursingPay
     List<NursingPaymentRecord> findAllByOrderByCreatedAtDesc();
     
     List<NursingPaymentRecord> findByCreatedAtAfterOrderByCreatedAtDesc(LocalDateTime createdAt);
+    
+    // Database sync function - synchronizes discount records with payment records
+    @Query(value = "SELECT sync_nursing_by_session_id(:sessionId)", nativeQuery = true)
+    String syncNursingBySessionId(@Param("sessionId") String sessionId);
 }

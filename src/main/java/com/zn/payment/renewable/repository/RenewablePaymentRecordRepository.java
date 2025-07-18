@@ -53,4 +53,8 @@ public interface RenewablePaymentRecordRepository extends JpaRepository<Renewabl
     List<RenewablePaymentRecord> findAllByOrderByCreatedAtDesc();
     
     List<RenewablePaymentRecord> findByCreatedAtAfterOrderByCreatedAtDesc(LocalDateTime createdAt);
+    
+    // Database sync function - synchronizes discount records with payment records
+    @Query(value = "SELECT sync_renewable_by_session_id(:sessionId)", nativeQuery = true)
+    String syncRenewableBySessionId(@Param("sessionId") String sessionId);
 }

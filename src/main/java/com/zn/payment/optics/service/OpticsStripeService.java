@@ -104,6 +104,7 @@ public class OpticsStripeService {
     /**
      * Auto-sync discount table when payment record is updated
      * This implements the constraint that discount table should be updated whenever payment record changes
+     * Now uses database sync function for better consistency
      */
     private void autoSyncDiscountOnPaymentUpdate(OpticsPaymentRecord paymentRecord) {
         if (paymentRecord == null || paymentRecord.getSessionId() == null) {
@@ -115,36 +116,65 @@ public class OpticsStripeService {
                  paymentRecord.getId(), paymentRecord.getSessionId());
         
         try {
-            // Find existing discount record or create new one
-            OpticsDiscounts discount = opticsDiscountsRepository.findBySessionId(paymentRecord.getSessionId());
-            boolean isNewDiscount = (discount == null);
+            // Call database sync function - this replaces the manual field copying
+            String syncResult = paymentRecordRepository.syncOpticsBySessionId(paymentRecord.getSessionId());
+            log.info("✅ Database sync result: {}", syncResult);
             
-            if (isNewDiscount) {
+            // Fallback to manual sync if database function indicates no discount record exists
+            if (syncResult != null && syncResult.contains("Only optics payment record exists")) {
                 log.info("📝 Creating new OpticsDiscounts record for session: {}", paymentRecord.getSessionId());
-                discount = new OpticsDiscounts();
+                OpticsDiscounts discount = new OpticsDiscounts();
                 discount.setSessionId(paymentRecord.getSessionId());
-            } else {
-                log.info("📝 Updating existing OpticsDiscounts ID: {} for session: {}", 
-                         discount.getId() != null ? discount.getId() : "null", paymentRecord.getSessionId());
-            }
-            
-            // Sync all fields from payment record to discount record
-            syncDiscountFields(paymentRecord, discount);
-            
-            // Save the discount record
-            OpticsDiscounts savedDiscount = opticsDiscountsRepository.save(discount);
-            
-            if (isNewDiscount) {
+                
+                // Sync all fields from payment record to discount record
+                syncDiscountFields(paymentRecord, discount);
+                
+                // Save the discount record
+                OpticsDiscounts savedDiscount = opticsDiscountsRepository.save(discount);
                 log.info("✅ Created new OpticsDiscounts ID: {} synced with PaymentRecord ID: {}", 
                          savedDiscount.getId(), paymentRecord.getId());
-            } else {
-                log.info("✅ Updated OpticsDiscounts ID: {} synced with PaymentRecord ID: {}", 
-                         savedDiscount.getId(), paymentRecord.getId());
+                
+                // Run sync again to ensure consistency
+                String secondSyncResult = paymentRecordRepository.syncOpticsBySessionId(paymentRecord.getSessionId());
+                log.info("✅ Second sync result: {}", secondSyncResult);
             }
             
         } catch (Exception e) {
-            log.error("❌ Auto-sync failed for payment record ID {}: {}", 
-                      paymentRecord.getId(), e.getMessage(), e);
+            log.error("❌ Database sync failed for session {}: {}", paymentRecord.getSessionId(), e.getMessage());
+            
+            // Fallback to manual sync on error
+            try {
+                log.info("🔄 Falling back to manual sync for session: {}", paymentRecord.getSessionId());
+                OpticsDiscounts discount = opticsDiscountsRepository.findBySessionId(paymentRecord.getSessionId());
+                boolean isNewDiscount = (discount == null);
+                
+                if (isNewDiscount) {
+                    log.info("📝 Creating new OpticsDiscounts record for session: {}", paymentRecord.getSessionId());
+                    discount = new OpticsDiscounts();
+                    discount.setSessionId(paymentRecord.getSessionId());
+                } else {
+                    log.info("📝 Updating existing OpticsDiscounts ID: {} for session: {}", 
+                             discount.getId() != null ? discount.getId() : "null", paymentRecord.getSessionId());
+                }
+                
+                // Sync all fields from payment record to discount record
+                syncDiscountFields(paymentRecord, discount);
+                
+                // Save the discount record
+                OpticsDiscounts savedDiscount = opticsDiscountsRepository.save(discount);
+                
+                if (isNewDiscount) {
+                    log.info("✅ Created new OpticsDiscounts ID: {} synced with PaymentRecord ID: {}", 
+                             savedDiscount.getId(), paymentRecord.getId());
+                } else {
+                    log.info("✅ Updated OpticsDiscounts ID: {} synced with PaymentRecord ID: {}", 
+                             savedDiscount.getId(), paymentRecord.getId());
+                }
+                
+            } catch (Exception fallbackException) {
+                log.error("❌ Manual sync fallback also failed for payment record ID {}: {}", 
+                          paymentRecord.getId(), fallbackException.getMessage());
+            }
         }
     }
     
