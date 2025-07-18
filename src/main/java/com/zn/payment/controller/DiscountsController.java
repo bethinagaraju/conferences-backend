@@ -113,11 +113,13 @@ public class DiscountsController {
             log.info("🎯 Processing discount webhook event: {}", eventType);
 
             boolean updated = false;
+            String sessionId = null;
+            String paymentIntentId = null;
             if ("checkout.session.completed".equals(eventType)) {
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                 if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                     com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                    String sessionId = session.getId();
+                    sessionId = session.getId();
                     log.info("[DiscountsController] Updating discount table for sessionId: {}", sessionId);
                     if (opticsDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
                         log.info("[DiscountsController] Updated OpticsDiscounts for sessionId: {}", sessionId);
@@ -136,7 +138,7 @@ public class DiscountsController {
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                 if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                     com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                    String paymentIntentId = paymentIntent.getId();
+                    paymentIntentId = paymentIntent.getId();
                     log.info("[DiscountsController] Updating discount table for paymentIntentId: {}", paymentIntentId);
                     if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
                         log.info("[DiscountsController] Updated OpticsDiscounts for paymentIntentId: {}", paymentIntentId);
@@ -155,7 +157,7 @@ public class DiscountsController {
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                 if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                     com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                    String paymentIntentId = paymentIntent.getId();
+                    paymentIntentId = paymentIntent.getId();
                     log.info("[DiscountsController] Updating discount table for paymentIntentId (FAILED): {}", paymentIntentId);
                     if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
                         log.info("[DiscountsController] Updated OpticsDiscounts for paymentIntentId: {}", paymentIntentId);
@@ -179,7 +181,9 @@ public class DiscountsController {
                 log.info("✅ Discount webhook processed and discount table updated. Event type: {}", eventType);
                 return ResponseEntity.ok("Discount webhook processed and discount table updated");
             } else {
-                log.warn("⚠️ No discount record found for webhook. Event type: {} - This might be a regular payment webhook sent to discount endpoint instead of /api/payments/webhook", eventType);
+                String identifier = sessionId != null ? "Session ID: " + sessionId : 
+                                  paymentIntentId != null ? "Payment Intent ID: " + paymentIntentId : "Unknown";
+                log.warn("⚠️ No discount record found for webhook. Event type: {}, {} - This might be a regular payment webhook sent to discount endpoint instead of /api/payments/webhook", eventType, identifier);
                 // Return success to avoid webhook retry loops for regular payments sent to discount endpoint
                 return ResponseEntity.ok("Webhook received but no discount record found - likely a regular payment sent to wrong endpoint");
             }
