@@ -216,91 +216,43 @@ public class PaymentController {
                 }
             }
 
-            // Enhanced webhook routing: check discount tables first
             if (event != null) {
                 String eventType = event.getType();
                 log.info("Processing webhook event type: {}", eventType);
 
-                // Check if this is a session-related event and route accordingly
-                if (eventType.startsWith("checkout.session.") || eventType.startsWith("payment_intent.")) {
-                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-
-                    if (stripeObjectOpt.isPresent()) {
-                        com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
-
-                        // Check if it's a session object
-                        if (stripeObject instanceof com.stripe.model.checkout.Session) {
-                            com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObject;
-                            String sessionId = session.getId();
-                            log.info("Webhook session_id: {}", sessionId);
-                            log.debug("Session object: {}", session);
-                            boolean updated = false;
-                            log.debug("Checking OpticsDiscounts for sessionId: {}", sessionId);
-                            if (opticsDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
-                                log.info("Session found and updated in OpticsDiscounts.");
-                                updated = true;
-                            } else {
-                                log.debug("Not found in OpticsDiscounts, checking NursingDiscounts for sessionId: {}", sessionId);
-                                if (nursingDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
-                                    log.info("Session found and updated in NursingDiscounts.");
-                                    updated = true;
-                                } else {
-                                    log.debug("Not found in NursingDiscounts, checking RenewableDiscounts for sessionId: {}", sessionId);
-                                    if (renewableDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
-                                        log.info("Session found and updated in RenewableDiscounts.");
-                                        updated = true;
-                                    }
-                                }
-                            }
-                            log.debug("Discount table update result for sessionId {}: {}", sessionId, updated);
-                            if (updated) {
-                                log.info("Returning 200 OK for discount table update, sessionId: {}", sessionId);
-                                return ResponseEntity.ok("Discount payment status updated in discount table");
-                            } else {
-                                log.warn("SessionId {} not found in any discount table, processing as normal payment...", sessionId);
-                                return processPaymentWebhook(event, session);
-                            }
-                        } else if (stripeObject instanceof com.stripe.model.PaymentIntent) {
-                            com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObject;
-                            String paymentIntentId = paymentIntent.getId();
-                            log.info("Webhook payment_intent_id: {}", paymentIntentId);
-                            log.debug("PaymentIntent object: {}", paymentIntent);
-                            boolean updated = false;
-                            log.debug("Checking OpticsDiscounts for paymentIntentId: {}", paymentIntentId);
-                            if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
-                                log.info("PaymentIntent found and updated in OpticsDiscounts.");
-                                updated = true;
-                            } else {
-                                log.debug("Not found in OpticsDiscounts, checking NursingDiscounts for paymentIntentId: {}", paymentIntentId);
-                                if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
-                                    log.info("PaymentIntent found and updated in NursingDiscounts.");
-                                    updated = true;
-                                } else {
-                                    log.debug("Not found in NursingDiscounts, checking RenewableDiscounts for paymentIntentId: {}", paymentIntentId);
-                                    if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
-                                        log.info("PaymentIntent found and updated in RenewableDiscounts.");
-                                        updated = true;
-                                    }
-                                }
-                            }
-                            log.debug("Discount table update result for paymentIntentId {}: {}", paymentIntentId, updated);
-                            if (updated) {
-                                log.info("Returning 200 OK for discount table update, paymentIntentId: {}", paymentIntentId);
-                                return ResponseEntity.ok("Discount payment status updated in discount table");
-                            } else {
-                                log.warn("PaymentIntentId {} not found in any discount table, processing as normal payment...", paymentIntentId);
-                                return processPaymentPaymentIntent(event, paymentIntent);
-                            }
+                // Route based on product name in session metadata if present
+                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                if (stripeObjectOpt.isPresent()) {
+                    com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
+                    String productName = null;
+                    if (stripeObject instanceof com.stripe.model.checkout.Session session) {
+                        if (session.getMetadata() != null) {
+                            productName = session.getMetadata().get("productName");
+                        }
+                    } else if (stripeObject instanceof com.stripe.model.PaymentIntent paymentIntent) {
+                        if (paymentIntent.getMetadata() != null) {
+                            productName = paymentIntent.getMetadata().get("productName");
+                        }
+                    }
+                    if (productName != null) {
+                        String productNameUpper = productName.toUpperCase();
+                        if (productNameUpper.contains("OPTICS")) {
+                            opticsStripeService.processWebhookEvent(event);
+                            log.info("✅ Webhook processed by Optics service by productName: {}", productName);
+                            return ResponseEntity.ok().body("Webhook processed by Optics service by productName: " + productName);
+                        } else if (productNameUpper.contains("NURSING")) {
+                            nursingStripeService.processWebhookEvent(event);
+                            log.info("✅ Webhook processed by Nursing service by productName: {}", productName);
+                            return ResponseEntity.ok().body("Webhook processed by Nursing service by productName: " + productName);
+                        } else if (productNameUpper.contains("RENEWABLE")) {
+                            renewableStripeService.processWebhookEvent(event);
+                            log.info("✅ Webhook processed by Renewable service by productName: {}", productName);
+                            return ResponseEntity.ok().body("Webhook processed by Renewable service by productName: " + productName);
                         }
                     }
                 }
-
-                // Handle other event types with generic processing
-                log.info("⚠️ Unhandled or non-session event type: {} - using fallback processing", eventType);
-            }
-
-            // Fallback processing if specific handlers didn't work
-            {
+                // If product name is not present or doesn't match, fallback to old logic
+                log.warn("Product name not found or did not match any site, using fallback processing.");
                 // Fallback: process with all services as before
                 boolean processed = false;
                 try {
@@ -335,6 +287,9 @@ public class PaymentController {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Webhook processing failed");
                 }
             }
+            // If event is null
+            log.error("❌ Stripe event could not be parsed");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Webhook event parse failed");
         } catch (Exception e) {
             log.error("❌ Error processing webhook: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Webhook processing failed");
