@@ -218,29 +218,41 @@ public class PaymentController {
 
             if (event != null) {
                 String eventType = event.getType();
-                log.info("Processing webhook event type: {}", eventType);
-
-                // Route based on product name in session metadata if present
+                log.info("[Webhook Debug] Processing webhook event type: {}", eventType);
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                 if (stripeObjectOpt.isPresent()) {
                     com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
                     log.info("[Webhook Debug] Stripe object class: {}", stripeObject.getClass().getName());
                     String productName = null;
                     java.util.Map<String, String> metadata = null;
-                    if (stripeObject instanceof com.stripe.model.checkout.Session session) {
+                    // Handle both event types
+                    if ("checkout.session.completed".equals(eventType) && stripeObject instanceof com.stripe.model.checkout.Session session) {
                         metadata = session.getMetadata();
                         log.info("[Webhook Debug] Session metadata: {}", metadata);
                         if (metadata != null) {
                             productName = metadata.get("productName");
                         }
-                    } else if (stripeObject instanceof com.stripe.model.PaymentIntent paymentIntent) {
+                    } else if ("payment_intent.succeeded".equals(eventType) && stripeObject instanceof com.stripe.model.PaymentIntent paymentIntent) {
                         metadata = paymentIntent.getMetadata();
                         log.info("[Webhook Debug] PaymentIntent metadata: {}", metadata);
                         if (metadata != null) {
                             productName = metadata.get("productName");
                         }
                     } else {
-                        log.warn("[Webhook Debug] Stripe object is not Session or PaymentIntent: {}", stripeObject.getClass().getName());
+                        // Try to extract productName from any metadata if present
+                        try {
+                            java.lang.reflect.Method getMetadata = stripeObject.getClass().getMethod("getMetadata");
+                            Object metaObj = getMetadata.invoke(stripeObject);
+                            if (metaObj instanceof java.util.Map) {
+                                metadata = (java.util.Map<String, String>) metaObj;
+                                log.info("[Webhook Debug] Generic metadata: {}", metadata);
+                                if (metadata != null) {
+                                    productName = metadata.get("productName");
+                                }
+                            }
+                        } catch (Exception ex) {
+                            log.warn("[Webhook Debug] Could not extract metadata from object: {}", ex.getMessage());
+                        }
                     }
                     log.info("[Webhook Debug] Extracted productName: {}", productName);
                     if (productName != null) {
