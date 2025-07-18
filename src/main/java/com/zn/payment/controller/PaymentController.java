@@ -217,8 +217,9 @@ public class PaymentController {
             }
 
             if (event != null) {
-                // 1. Try to extract productName from event metadata
+                // 1. Try to extract productName and paymentType from event metadata
                 String productName = null;
+                String paymentType = null;
                 try {
                     java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                     if (stripeObjectOpt.isPresent()) {
@@ -231,6 +232,7 @@ public class PaymentController {
                                 metadata = (java.util.Map<String, String>) metaObj;
                                 if (metadata != null) {
                                     productName = metadata.get("productName");
+                                    paymentType = metadata.get("paymentType");
                                 }
                             }
                         } catch (Exception ex) {
@@ -238,8 +240,47 @@ public class PaymentController {
                         }
                     }
                 } catch (Exception ex) {
-                    log.warn("[Webhook Debug] Could not extract productName from event: {}", ex.getMessage());
+                    log.warn("[Webhook Debug] Could not extract productName/paymentType from event: {}", ex.getMessage());
                 }
+
+                // If paymentType is discount-registration, process only discount tables
+                if (paymentType != null && paymentType.equalsIgnoreCase("discount-registration")) {
+                    log.info("[Webhook Debug] Detected discount-registration paymentType. Routing to discount services only.");
+                    boolean updated = false;
+                    String sessionId = null;
+                    try {
+                        java.util.Optional<com.stripe.model.StripeObject> sessionOpt = event.getDataObjectDeserializer().getObject();
+                        if (sessionOpt.isPresent() && sessionOpt.get() instanceof com.stripe.model.checkout.Session) {
+                            com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) sessionOpt.get();
+                            sessionId = session.getId();
+                        }
+                    } catch (Exception ex) {
+                        log.warn("[Webhook Debug] Could not extract sessionId for discount: {}", ex.getMessage());
+                    }
+                    if (sessionId != null) {
+                        if (opticsDiscountsRepository.findBySessionId(sessionId) != null) {
+                            log.info("Session found in OpticsDiscounts, updating status...");
+                            opticsDiscountsService.processWebhookEvent(event);
+                            updated = true;
+                        } else if (nursingDiscountsRepository.findBySessionId(sessionId) != null) {
+                            log.info("Session found in NursingDiscounts, updating status...");
+                            nursingDiscountsService.processWebhookEvent(event);
+                            updated = true;
+                        } else if (renewableDiscountsRepository.findBySessionId(sessionId) != null) {
+                            log.info("Session found in RenewableDiscounts, updating status...");
+                            renewableDiscountsService.processWebhookEvent(event);
+                            updated = true;
+                        }
+                    }
+                    if (updated) {
+                        return ResponseEntity.ok("Discount payment status updated in discount table");
+                    } else {
+                        log.warn("[Webhook Debug] Discount session not found in any discount table. No table updated.");
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Discount session not found in any discount table. No table updated.");
+                    }
+                }
+
+                // 2. Try to extract productName for normal routing
                 if (productName != null && !productName.isEmpty()) {
                     String productNameUpper = productName.toUpperCase();
                     log.info("[Webhook Debug] Found productName: {}", productName);
@@ -262,7 +303,7 @@ public class PaymentController {
                         log.warn("[Webhook Debug] productName '{}' did not match any site, will try success_url fallback.", productName);
                     }
                 }
-                // 2. Fallback: Try to extract success_url from event JSON
+                // 3. Fallback: Try to extract success_url from event JSON
                 String successUrl = null;
                 try {
                     com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
