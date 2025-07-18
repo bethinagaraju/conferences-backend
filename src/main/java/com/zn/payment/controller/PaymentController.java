@@ -195,39 +195,49 @@ public class PaymentController {
                     log.warn("[Webhook Debug] Stripe object not present in event, using fallback processing. Event type: {}", eventType);
                     log.info("[Webhook Debug] Event JSON: {}", event.toJson());
                 }
-                // Fallback: process with all services as before
+                // Fallback: try to extract productName from event JSON if not already found
                 log.info("[Webhook Debug] Entering fallback/default routing block.");
-                boolean processed = false;
+                String fallbackProductName = null;
                 try {
-                    opticsStripeService.processWebhookEvent(event);
-                    processed = true;
-                    log.info("✅ Webhook processed by Optics service (default). Event type: {}", event.getType());
-                } catch (Exception e) {
-                    log.debug("Optics service couldn't process webhook: {}", e.getMessage());
+                    String eventJson = event.toJson();
+                    // Try to extract productName from event JSON (very basic, not robust)
+                    int idx = eventJson.indexOf("productName");
+                    if (idx != -1) {
+                        int start = eventJson.indexOf(':', idx) + 1;
+                        int end = eventJson.indexOf(',', start);
+                        if (end == -1) end = eventJson.indexOf('}', start);
+                        if (start != -1 && end != -1) {
+                            fallbackProductName = eventJson.substring(start, end).replaceAll("[\"{}]", "").trim();
+                        }
+                    }
+                } catch (Exception ex) {
+                    log.warn("[Webhook Debug] Could not extract productName from event JSON in fallback: {}", ex.getMessage());
                 }
-                if (!processed) {
-                    try {
+                String effectiveProductName = fallbackProductName;
+                if (effectiveProductName != null && !effectiveProductName.isEmpty()) {
+                    String productNameUpper = effectiveProductName.toUpperCase();
+                    if (productNameUpper.contains("OPTICS")) {
+                        log.info("[Webhook Debug] Fallback: Routing to Optics service by productName match.");
+                        opticsStripeService.processWebhookEvent(event);
+                        log.info("✅ Webhook processed by Optics service (fallback) by productName: {}", effectiveProductName);
+                        return ResponseEntity.ok().body("Webhook processed by Optics service (fallback) by productName: " + effectiveProductName);
+                    } else if (productNameUpper.contains("NURSING")) {
+                        log.info("[Webhook Debug] Fallback: Routing to Nursing service by productName match.");
                         nursingStripeService.processWebhookEvent(event);
-                        processed = true;
-                        log.info("✅ Webhook processed by Nursing service (default). Event type: {}", event.getType());
-                    } catch (Exception e) {
-                        log.debug("Nursing service couldn't process webhook: {}", e.getMessage());
-                    }
-                }
-                if (!processed) {
-                    try {
+                        log.info("✅ Webhook processed by Nursing service (fallback) by productName: {}", effectiveProductName);
+                        return ResponseEntity.ok().body("Webhook processed by Nursing service (fallback) by productName: " + effectiveProductName);
+                    } else if (productNameUpper.contains("RENEWABLE")) {
+                        log.info("[Webhook Debug] Fallback: Routing to Renewable service by productName match.");
                         renewableStripeService.processWebhookEvent(event);
-                        processed = true;
-                        log.info("✅ Webhook processed by Renewable service (default). Event type: {}", event.getType());
-                    } catch (Exception e) {
-                        log.debug("Renewable service couldn't process webhook: {}", e.getMessage());
+                        log.info("✅ Webhook processed by Renewable service (fallback) by productName: {}", effectiveProductName);
+                        return ResponseEntity.ok().body("Webhook processed by Renewable service (fallback) by productName: " + effectiveProductName);
+                    } else {
+                        log.warn("[Webhook Debug] Fallback: Product name '{}' did not match any site. No table will be updated.", effectiveProductName);
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Fallback: Product name did not match any site. No table updated.");
                     }
-                }
-                if (processed) {
-                    return ResponseEntity.ok().body("Webhook processed successfully");
                 } else {
-                    log.error("❌ No service could process the webhook");
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Webhook processing failed");
+                    log.error("[Webhook Debug] Fallback: No productName found in event. No table will be updated.");
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Fallback: No productName found. No table updated.");
                 }
             }
             // If event is null
