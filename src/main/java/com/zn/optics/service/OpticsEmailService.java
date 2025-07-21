@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@Slf4j // Using Lombok's @Slf4j for logging
+@Slf4j 
 public class OpticsEmailService {
 
     @Autowired
@@ -18,7 +18,7 @@ public class OpticsEmailService {
     public void sendContactMessage(String name, String email, String subject, String messageBody) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo("secretary@globalrenewablemeet.com"); // Recipient
+            message.setTo("secretary@globallopmeet.com"); // Correct recipient for Optics
             message.setSubject("Contact Us Form: " + subject);
             message.setText(
                 "Name: " + name + "\n" +
@@ -27,13 +27,10 @@ public class OpticsEmailService {
             );
             message.setFrom("secretary@globalrenewablemeet.com"); // Must match SMTP username
             message.setReplyTo(email); // Allows replying directly to user
-            
-
             mailSender.send(message);
             log.info("Email sent successfully to {}", message.getTo()[0]);
         } catch (MailException e) {
-            // Log and optionally rethrow or handle it
-            System.err.println("Error sending email: " + e.getMessage());
+            log.error("Error sending email: {}", e.getMessage(), e);
         }
     }
 }

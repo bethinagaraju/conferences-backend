@@ -245,7 +245,7 @@ public class PaymentController {
 
                 // If paymentType is discount-registration, process only discount tables
                 if (paymentType != null && paymentType.equalsIgnoreCase("discount-registration")) {
-                    log.info("[Webhook Debug] Detected discount-registration paymentType. Routing to discount services only.");
+                    // log.info("[Webhook Debug] Detected discount-registration paymentType. Routing to discount services only.");
                     boolean updated = false;
                     String sessionId = null;
                     try {
@@ -255,19 +255,19 @@ public class PaymentController {
                             sessionId = session.getId();
                         }
                     } catch (Exception ex) {
-                        log.warn("[Webhook Debug] Could not extract sessionId for discount: {}", ex.getMessage());
+                        // log.warn("[Webhook Debug] Could not extract sessionId for discount: {}", ex.getMessage());
                     }
                     if (sessionId != null) {
                         if (opticsDiscountsRepository.findBySessionId(sessionId) != null) {
-                            log.info("Session found in OpticsDiscounts, updating status...");
+                            // log.info("Session found in OpticsDiscounts, updating status...");
                             opticsDiscountsService.processWebhookEvent(event);
                             updated = true;
                         } else if (nursingDiscountsRepository.findBySessionId(sessionId) != null) {
-                            log.info("Session found in NursingDiscounts, updating status...");
+                            // log.info("Session found in NursingDiscounts, updating status...");
                             nursingDiscountsService.processWebhookEvent(event);
                             updated = true;
                         } else if (renewableDiscountsRepository.findBySessionId(sessionId) != null) {
-                            log.info("Session found in RenewableDiscounts, updating status...");
+                            // log.info("Session found in RenewableDiscounts, updating status...");
                             renewableDiscountsService.processWebhookEvent(event);
                             updated = true;
                         }
@@ -275,7 +275,7 @@ public class PaymentController {
                     if (updated) {
                         return ResponseEntity.ok("Discount payment status updated in discount table");
                     } else {
-                        log.warn("[Webhook Debug] Discount session not found in any discount table. No table updated.");
+                        // log.warn("[Webhook Debug] Discount session not found in any discount table. No table updated.");
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Discount session not found in any discount table. No table updated.");
                     }
                 }
@@ -287,20 +287,20 @@ public class PaymentController {
                     if (productNameUpper.contains("OPTICS")) {
                         log.info("[Webhook Debug] Routing to Optics service by productName match.");
                         opticsStripeService.processWebhookEvent(event);
-                        log.info("✅ Webhook processed by Optics service by productName: {}", productName);
+                        log.info("✅ Webhook processed by Optics service by productName");
                         return ResponseEntity.ok().body("Webhook processed by Optics service by productName: " + productName);
                     } else if (productNameUpper.contains("NURSING")) {
                         log.info("[Webhook Debug] Routing to Nursing service by productName match.");
                         nursingStripeService.processWebhookEvent(event);
-                        log.info("✅ Webhook processed by Nursing service by productName: {}", productName);
+                        log.info("✅ Webhook processed by Nursing service by productName");
                         return ResponseEntity.ok().body("Webhook processed by Nursing service by productName: " + productName);
                     } else if (productNameUpper.contains("RENEWABLE")) {
                         log.info("[Webhook Debug] Routing to Renewable service by productName match.");
                         renewableStripeService.processWebhookEvent(event);
-                        log.info("✅ Webhook processed by Renewable service by productName: {}", productName);
+                        log.info("✅ Webhook processed by Renewable service by productName");
                         return ResponseEntity.ok().body("Webhook processed by Renewable service by productName: " + productName);
                     } else {
-                        log.warn("[Webhook Debug] productName '{}' did not match any site, will try success_url fallback.", productName);
+                        log.warn("[Webhook Debug] productName did not match any site, will try success_url fallback.");
                     }
                 }
                 // 3. Fallback: Try to extract success_url from event JSON
@@ -314,24 +314,24 @@ public class PaymentController {
                 }
                 if (successUrl != null && !successUrl.isEmpty()) {
                     String urlLower = successUrl.toLowerCase();
-                    log.info("[Webhook Debug] Found success_url: {}", successUrl);
+                    // log.info("[Webhook Debug] Found success_url: {}", successUrl); // Removed as requested
                     if (urlLower.contains("globallopmeet.com") || urlLower.contains("optics")) {
                         log.info("[Webhook Debug] Routing to Optics service by success_url/domain match.");
                         opticsStripeService.processWebhookEvent(event);
-                        log.info("✅ Webhook processed by Optics service by success_url: {}", successUrl);
-                        return ResponseEntity.ok().body("Webhook processed by Optics service by success_url: " + successUrl);
+                        log.info("✅ Webhook processed by Optics service by success_url");
+                        return ResponseEntity.ok().body("Webhook processed by Optics service by success_url");
                     } else if (urlLower.contains("nursingmeet2026.com") || urlLower.contains("nursing")) {
                         log.info("[Webhook Debug] Routing to Nursing service by success_url/domain match.");
                         nursingStripeService.processWebhookEvent(event);
-                        log.info("✅ Webhook processed by Nursing service by success_url: {}", successUrl);
-                        return ResponseEntity.ok().body("Webhook processed by Nursing service by success_url: " + successUrl);
+                        log.info("✅ Webhook processed by Nursing service by success_url");
+                        return ResponseEntity.ok().body("Webhook processed by Nursing service by success_url");
                     } else if (urlLower.contains("globalrenewablemeet.com") || urlLower.contains("renewable")) {
                         log.info("[Webhook Debug] Routing to Renewable service by success_url/domain match.");
                         renewableStripeService.processWebhookEvent(event);
-                        log.info("✅ Webhook processed by Renewable service by success_url: {}", successUrl);
-                        return ResponseEntity.ok().body("Webhook processed by Renewable service by success_url: " + successUrl);
+                        log.info("✅ Webhook processed by Renewable service by success_url");
+                        return ResponseEntity.ok().body("Webhook processed by Renewable service by success_url");
                     } else {
-                        log.warn("[Webhook Debug] success_url '{}' did not match any site. No table will be updated.", successUrl);
+                        log.warn("[Webhook Debug] success_url did not match any site. No table will be updated.");
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("success_url did not match any site. No table updated.");
                     }
                 } else {
@@ -383,10 +383,8 @@ public class PaymentController {
         try {
             Event event = opticsStripeService.constructWebhookEvent(payload, sigHeader);
             opticsStripeService.processWebhookEvent(event);
-            
-            log.info("✅ Optics webhook processed successfully. Event type: {}", event.getType());
+            // log.info("✅ Optics webhook processed successfully. Event type: {}", event.getType()); // Removed event type log
             return ResponseEntity.ok().body("Optics webhook processed successfully");
-            
         } catch (Exception e) {
             log.error("❌ Error processing Optics webhook: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Optics webhook processing failed");
@@ -403,10 +401,8 @@ public class PaymentController {
         try {
             Event event = nursingStripeService.constructWebhookEvent(payload, sigHeader);
             nursingStripeService.processWebhookEvent(event);
-            
-            log.info("✅ Nursing webhook processed successfully. Event type: {}", event.getType());
+            // log.info("✅ Nursing webhook processed successfully. Event type: {}", event.getType()); // Removed event type log
             return ResponseEntity.ok().body("Nursing webhook processed successfully");
-            
         } catch (Exception e) {
             log.error("❌ Error processing Nursing webhook: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Nursing webhook processing failed");
@@ -423,10 +419,8 @@ public class PaymentController {
         try {
             Event event = renewableStripeService.constructWebhookEvent(payload, sigHeader);
             renewableStripeService.processWebhookEvent(event);
-            
-            log.info("✅ Renewable webhook processed successfully. Event type: {}", event.getType());
+            // log.info("✅ Renewable webhook processed successfully. Event type: {}", event.getType()); // Removed event type log
             return ResponseEntity.ok().body("Renewable webhook processed successfully");
-            
         } catch (Exception e) {
             log.error("❌ Error processing Renewable webhook: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Renewable webhook processing failed");

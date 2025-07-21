@@ -18,7 +18,7 @@ public class RenewableEmailService {
     public void sendContactMessage(String name, String email, String subject, String messageBody) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo("secretary@globalrenewablemeet.com"); // Recipient
+            message.setTo("secretary@globalrenewablemeet.com"); // Correct recipient for Renewable
             message.setSubject("Contact Us Form: " + subject);
             message.setText(
                 "Name: " + name + "\n" +
@@ -32,8 +32,7 @@ public class RenewableEmailService {
             mailSender.send(message);
             log.info("Email sent successfully to {}", message.getTo()[0]);
         } catch (MailException e) {
-            // Log and optionally rethrow or handle it
-            System.err.println("Error sending email: " + e.getMessage());
+            log.error("Error sending email: {}", e.getMessage(), e);
         }
     }
 }
