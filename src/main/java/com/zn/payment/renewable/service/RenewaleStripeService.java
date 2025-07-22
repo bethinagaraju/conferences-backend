@@ -555,32 +555,14 @@ public class RenewaleStripeService {
         
         // 1. Validate currency is EUR
         validateEuroCurrency(request);
-        
         // 2. Fetch pricing config by ID
         RenewablePricingConfig pricingConfig = pricingConfigRepository.findById(pricingConfigId)
             .orElseThrow(() -> new IllegalArgumentException("Pricing config not found with ID: " + pricingConfigId));
-        
         log.info("Found pricing config with total price: {} EUR", pricingConfig.getTotalPrice());
-        
-        // 3. Convert request amount back to euros for comparison (request comes in cents after controller conversion)
-        BigDecimal requestTotalInEuros = BigDecimal.valueOf(request.getUnitAmount() * request.getQuantity()).divide(BigDecimal.valueOf(100));
-        BigDecimal pricingConfigTotalInEuros = pricingConfig.getTotalPrice();
-        
-        log.info("Comparing amounts in EUROS - Request total: {} EUR, PricingConfig total: {} EUR", 
-                requestTotalInEuros, pricingConfigTotalInEuros);
-        
-        // 4. Validate amounts match exactly in EUROS (with scale precision)
-        if (requestTotalInEuros.compareTo(pricingConfigTotalInEuros) != 0) {
-            log.error("❌ Payment amount validation failed in EUROS. Expected: {} EUR, Requested: {} EUR", 
-                     pricingConfigTotalInEuros, requestTotalInEuros);
-            throw new IllegalArgumentException(
-                String.format("Payment amount mismatch. Expected: %s EUR from pricing config, but received: %s EUR in request", 
-                            pricingConfigTotalInEuros, requestTotalInEuros));
-        }
-        
-        log.info("✅ Amount validation passed in EUROS: {} EUR matches pricing config", requestTotalInEuros);
-        
-        // 5. Create Stripe session using the existing method
+        // Always use backend pricing config value for Stripe payments
+        Long unitAmountInCents = pricingConfig.getTotalPrice().multiply(BigDecimal.valueOf(100)).longValue();
+        request.setUnitAmount(unitAmountInCents); // Stripe expects cents
+        // 5. Create Stripe session
         Session session = createCheckoutSessionWithPricing(request, pricingConfig);
         
         // 6. Fetch the saved PaymentRecord from database
