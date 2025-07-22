@@ -40,29 +40,6 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }    
     @Bean
-      public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-            "https://renewable-meet-2026.vercel.app",
-            "https://globalrenewablemeet.com", // Allow all Vercel subdomains
-            "http://localhost:*",
-            "https://localhost:*",
-          
-            "https://globallopmeet.com",
-            "https://api.zynmarketing.xyz",
-              "http://147.93.102.131:*"
-           
-        ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setAllowCredentials(true); // Important for cookies
-        configuration.setExposedHeaders(Arrays.asList("Set-Cookie")); // Expose cookie headers
-        
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }    
-    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
