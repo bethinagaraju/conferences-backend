@@ -49,7 +49,7 @@ public class NursingFormSubmissionService {
     private INursingSessionOption sessionOptionsRepo;
 
     public NursingForm saveSubmission(AbstractSubmissionRequestDTO request) {
-    	NursingForm formSubmission = new NursingForm();
+        NursingForm formSubmission = new NursingForm();
 
         // Set basic fields
         formSubmission.setTitlePrefix(request.getTitlePrefix());
@@ -86,7 +86,8 @@ public class NursingFormSubmissionService {
             }
 
             String fileName = file.getOriginalFilename();
-            String pathInBucket = userId + "/" + fileName;
+            // Store in a folder named after the service: 'nursing/{userId}/{fileName}'
+            String pathInBucket = "nursing/" + userId + "/" + fileName;
 
             String uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/" + pathInBucket;
 
@@ -110,32 +111,32 @@ public class NursingFormSubmissionService {
         }
     }
 
-	public List<?> getInterestedInOptions() {
-		try {
-			log.info("Retrieving interested in options from repository");
-			return interestedInRepo.findAll();
-		} catch (Exception e) {
-			log.error("Error retrieving interested in options: ", e);
-			e.printStackTrace();
-			return null; // or handle the error appropriately
-		}
-		
-	}
+    public List<?> getInterestedInOptions() {
+        try {
+            log.info("Retrieving interested in options from repository");
+            return interestedInRepo.findAll();
+        } catch (Exception e) {
+            log.error("Error retrieving interested in options: ", e);
+            e.printStackTrace();
+            return null; // or handle the error appropriately
+        }
+        
+    }
 
-	public List<?> getSessionOptions() {
-		
-		
-		try {
-			return sessionOptionsRepo.findAll();
-		} catch (Exception e) {
-			e.printStackTrace();
-			return null; // or handle the error appropriately
-		}
-		
-	}
-	//Get all form submissions 
-	
-	
-	
-	
+    public List<?> getSessionOptions() {
+        
+        
+        try {
+            return sessionOptionsRepo.findAll();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null; // or handle the error appropriately
+        }
+        
+    }
+    //Get all form submissions 
+    
+    
+    
+    
 }

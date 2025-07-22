@@ -49,7 +49,7 @@ public class OpticsFormSubmissionService {
     private IOpticsSessionOption sessionOptionsRepo;
 
     public OpticsForm saveSubmission(AbstractSubmissionRequestDTO request) {
-    	OpticsForm formSubmission = new OpticsForm();
+        OpticsForm formSubmission = new OpticsForm();
 
         // Set basic fields
         formSubmission.setTitlePrefix(request.getTitlePrefix());
@@ -86,7 +86,8 @@ public class OpticsFormSubmissionService {
             }
 
             String fileName = file.getOriginalFilename();
-            String pathInBucket = userId + "/" + fileName;
+            // Store in a folder named after the service: 'optics/{userId}/{fileName}'
+            String pathInBucket = "optics/" + userId + "/" + fileName;
 
             String uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/" + pathInBucket;
 
@@ -110,32 +111,32 @@ public class OpticsFormSubmissionService {
         }
     }
 
-	public List<?> getInterestedInOptions() {
-		try {
-			log.info("Retrieving interested in options from repository");
-			return interestedInRepo.findAll();
-		} catch (Exception e) {
-			log.error("Error retrieving interested in options: ", e);
-			e.printStackTrace();
-			return null; // or handle the error appropriately
-		}
-		
-	}
+    public List<?> getInterestedInOptions() {
+        try {
+            log.info("Retrieving interested in options from repository");
+            return interestedInRepo.findAll();
+        } catch (Exception e) {
+            log.error("Error retrieving interested in options: ", e);
+            e.printStackTrace();
+            return null; // or handle the error appropriately
+        }
+        
+    }
 
-	public List<?> getSessionOptions() {
-		
-		
-		try {
-			return sessionOptionsRepo.findAll();
-		} catch (Exception e) {
-			e.printStackTrace();
-			return null; // or handle the error appropriately
-		}
-		
-	}
-	//Get all form submissions 
-	
-	
-	
-	
+    public List<?> getSessionOptions() {
+        
+        
+        try {
+            return sessionOptionsRepo.findAll();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null; // or handle the error appropriately
+        }
+        
+    }
+    //Get all form submissions 
+    
+    
+    
+    
 }
