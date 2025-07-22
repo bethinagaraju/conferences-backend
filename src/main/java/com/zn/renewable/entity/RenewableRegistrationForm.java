@@ -40,7 +40,7 @@ public class RenewableRegistrationForm {
     private BigDecimal amountPaid; // snapshot of totalPrice at registration time
     
     // One-to-One relationship with RenewablePaymentRecord
-    @OneToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "payment_record_id", referencedColumnName = "id")
     @JsonManagedReference
     private RenewablePaymentRecord renewablePaymentRecord;
