@@ -379,6 +379,85 @@ public class AdminService {
 	public List<?> getAllNursingSessionOptions() {
 		return nursingSessionOption.findAll();
 	}
+	// --- Edit and Delete Interested-In Option for each vertical (admin) ---
+	// Optics
+	public void editOpticsInterestedInOption(Long id, String newOption) {
+		var optional = opticsInterestedInOptionRepo.findById(id);
+		if (optional == null || optional.isEmpty()) throw new DataProcessingException("Optics interested-in option not found with ID: " + id);
+		var entity = optional.get();
+		setInterestedInOptionField(entity, newOption);
+		opticsInterestedInOptionRepo.save(entity);
+	}
+
+	public void deleteOpticsInterestedInOption(Long id) {
+		if (id == null || !opticsInterestedInOptionRepo.existsById(id)) throw new DataProcessingException("Optics interested-in option not found with ID: " + id);
+		opticsInterestedInOptionRepo.deleteById(id);
+	}
+
+	// Renewable
+	public void editRenewableInterestedInOption(Long id, String newOption) {
+		var optional = renewableInterestedInOptionRepo.findById(id);
+		if (optional == null || optional.isEmpty()) throw new DataProcessingException("Renewable interested-in option not found with ID: " + id);
+		var entity = optional.get();
+		setInterestedInOptionField(entity, newOption);
+		renewableInterestedInOptionRepo.save(entity);
+	}
+
+	public void deleteRenewableInterestedInOption(Long id) {
+		if (id == null || !renewableInterestedInOptionRepo.existsById(id)) throw new DataProcessingException("Renewable interested-in option not found with ID: " + id);
+		renewableInterestedInOptionRepo.deleteById(id);
+	}
+
+	// Nursing
+	public void editNursingInterestedInOption(Long id, String newOption) {
+		var optional = nursingInterestedInOptionRepo.findById(id);
+		if (optional == null || optional.isEmpty()) throw new DataProcessingException("Nursing interested-in option not found with ID: " + id);
+		var entity = optional.get();
+		setInterestedInOptionField(entity, newOption);
+		nursingInterestedInOptionRepo.save(entity);
+	}
+
+	public void deleteNursingInterestedInOption(Long id) {
+		if (id == null || !nursingInterestedInOptionRepo.existsById(id)) throw new DataProcessingException("Nursing interested-in option not found with ID: " + id);
+		nursingInterestedInOptionRepo.deleteById(id);
+	}
+
+	// Helper: set the interested-in option field reflectively for all verticals
+	private void setInterestedInOptionField(Object entity, String value) {
+		try {
+			var method = entity.getClass().getMethod("setOptionName", String.class);
+			method.invoke(entity, value);
+			return;
+		} catch (Exception ignored) {}
+		try {
+			var method = entity.getClass().getMethod("setInterestedInOption", String.class);
+			method.invoke(entity, value);
+			return;
+		} catch (Exception ignored) {}
+		try {
+			var method = entity.getClass().getMethod("setName", String.class);
+			method.invoke(entity, value);
+			return;
+		} catch (Exception ignored) {}
+		// Try direct field access as last resort
+		try {
+			var field = entity.getClass().getDeclaredField("option_name");
+			field.setAccessible(true);
+			field.set(entity, value);
+			return;
+		} catch (Exception ignored) {}
+		try {
+			var field = entity.getClass().getDeclaredField("interestedInOption");
+			field.setAccessible(true);
+			field.set(entity, value);
+			return;
+		} catch (Exception ignored) {}
+		try {
+			var field = entity.getClass().getDeclaredField("name");
+			field.setAccessible(true);
+			field.set(entity, value);
+		} catch (Exception ignored) {}
+	}
 
 // public List<Form> getAllAbstractSubmissions() {
 //     try {

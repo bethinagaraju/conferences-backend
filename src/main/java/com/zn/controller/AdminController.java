@@ -777,6 +777,82 @@ public ResponseEntity<?> recalculateAllNursingPricingConfigs() {
 			throw new DataProcessingException("Failed to retrieve nursing accommodations: " + e.getMessage(), e);
 		}
 	}
+		// Edit interested-in option for each vertical (admin)
+	@PostMapping("/api/admin/interested-in/edit/optics/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> editOpticsInterestedInOption(@PathVariable Long id, @RequestBody InterestedInOptionDTO dto) {
+		try {
+			if (dto == null || dto.getInterestedInOption() == null || dto.getInterestedInOption().trim().isEmpty()) {
+				return ResponseEntity.badRequest().body("Invalid interested-in option");
+			}
+			adminService.editOpticsInterestedInOption(id, dto.getInterestedInOption().trim());
+			return ResponseEntity.ok("Optics interested-in option updated successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update optics interested-in option: " + e.getMessage());
+		}
+	}
+
+	@PostMapping("/api/admin/interested-in/edit/renewable/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> editRenewableInterestedInOption(@PathVariable Long id, @RequestBody InterestedInOptionDTO dto) {
+		try {
+			if (dto == null || dto.getInterestedInOption() == null || dto.getInterestedInOption().trim().isEmpty()) {
+				return ResponseEntity.badRequest().body("Invalid interested-in option");
+			}
+			adminService.editRenewableInterestedInOption(id, dto.getInterestedInOption().trim());
+			return ResponseEntity.ok("Renewable interested-in option updated successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update renewable interested-in option: " + e.getMessage());
+		}
+	}
+
+	@PostMapping("/api/admin/interested-in/edit/nursing/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> editNursingInterestedInOption(@PathVariable Long id, @RequestBody InterestedInOptionDTO dto) {
+		try {
+			if (dto == null || dto.getInterestedInOption() == null || dto.getInterestedInOption().trim().isEmpty()) {
+				return ResponseEntity.badRequest().body("Invalid interested-in option");
+			}
+			adminService.editNursingInterestedInOption(id, dto.getInterestedInOption().trim());
+			return ResponseEntity.ok("Nursing interested-in option updated successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update nursing interested-in option: " + e.getMessage());
+		}
+	}
+
+	// Delete interested-in option for each vertical (admin)
+	@PostMapping("/api/admin/interested-in/delete/optics/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> deleteOpticsInterestedInOption(@PathVariable Long id) {
+		try {
+			adminService.deleteOpticsInterestedInOption(id);
+			return ResponseEntity.ok("Optics interested-in option deleted successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete optics interested-in option: " + e.getMessage());
+		}
+	}
+
+	@PostMapping("/api/admin/interested-in/delete/renewable/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> deleteRenewableInterestedInOption(@PathVariable Long id) {
+		try {
+			adminService.deleteRenewableInterestedInOption(id);
+			return ResponseEntity.ok("Renewable interested-in option deleted successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete renewable interested-in option: " + e.getMessage());
+		}
+	}
+
+	@PostMapping("/api/admin/interested-in/delete/nursing/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> deleteNursingInterestedInOption(@PathVariable Long id) {
+		try {
+			adminService.deleteNursingInterestedInOption(id);
+			return ResponseEntity.ok("Nursing interested-in option deleted successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete nursing interested-in option: " + e.getMessage());
+		}
+	}
 
 
 }
