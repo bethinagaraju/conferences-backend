@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.stripe.model.Event;
 import com.stripe.model.PaymentIntent;
+import com.zn.nursing.entity.NursingRegistrationForm;
+import com.zn.nursing.repository.INursingRegistrationFormRepository;
 import com.zn.optics.entity.OpticsPricingConfig;
 import com.zn.optics.entity.OpticsRegistrationForm;
 import com.zn.optics.repository.IOpricsRegistrationFormRepository;
@@ -43,6 +45,8 @@ import com.zn.payment.renewable.entity.RenewablePaymentRecord;
 import com.zn.payment.renewable.repository.RenewableDiscountsRepository;
 import com.zn.payment.renewable.service.RenewableDiscountsService;
 import com.zn.payment.renewable.service.RenewaleStripeService;
+import com.zn.renewable.entity.RenewableRegistrationForm;
+import com.zn.renewable.repository.IRenewableRegistrationFormRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +55,19 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/payment")
 @Slf4j
 public class PaymentController {
+
+    // Nursing and Renewable registration repositories
+    @Autowired
+    private INursingRegistrationFormRepository nursingRegistrationFormRepository;
+
+    @Autowired
+    private IRenewableRegistrationFormRepository renewableRegistrationFormRepository;
+
+    @Autowired
+    private com.zn.nursing.repository.INursingPricingConfigRepository nursingPricingConfigRepository;
+
+    @Autowired
+    private com.zn.renewable.repository.IRenewablePricingConfigRepository renewablePricingConfigRepository;
 
     @Autowired
     private OpticsStripeService opticsStripeService;
@@ -550,12 +567,31 @@ public class PaymentController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(createNursingErrorResponse("pricing_config_id_required"));
             }
-            
+
+            // Always use backend value for payment amount - CORE BUSINESS LOGIC
+            com.zn.nursing.entity.NursingPricingConfig pricingConfig = nursingPricingConfigRepository.findById(pricingConfigId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pricing config not found with ID: " + pricingConfigId));
+            java.math.BigDecimal backendTotalPrice = pricingConfig.getTotalPrice();
+            Long unitAmountInCents = backendTotalPrice.multiply(new java.math.BigDecimal(100)).longValue();
+            request.setUnitAmount(unitAmountInCents); // Stripe expects cents
+
+            // Save registration record before payment (like optics)
+            NursingRegistrationForm registrationForm = new NursingRegistrationForm();
+            registrationForm.setName(request.getName() != null ? request.getName() : "");
+            registrationForm.setPhone(request.getPhone() != null ? request.getPhone() : "");
+            registrationForm.setEmail(request.getEmail());
+            registrationForm.setInstituteOrUniversity(request.getInstituteOrUniversity() != null ? request.getInstituteOrUniversity() : "");
+            registrationForm.setCountry(request.getCountry() != null ? request.getCountry() : "");
+            registrationForm.setPricingConfig(pricingConfig);
+            registrationForm.setAmountPaid(backendTotalPrice);
+            NursingRegistrationForm savedRegistration = nursingRegistrationFormRepository.save(registrationForm);
+            log.info("✅ Nursing registration form created and saved with ID: {}", savedRegistration.getId());
+
             // Call nursing service - this will save to nursing_payment_records table
             NursingPaymentResponseDTO response = nursingStripeService.createCheckoutSessionWithPricingValidation(request, pricingConfigId);
             log.info("Nursing checkout session created successfully. Session ID: {}", response.getSessionId());
             return ResponseEntity.ok(response);
-            
+
         } catch (IllegalArgumentException e) {
             log.error("Validation error creating nursing checkout session: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -575,12 +611,31 @@ public class PaymentController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(createRenewableErrorResponse("pricing_config_id_required"));
             }
-            
+
+            // Always use backend value for payment amount - CORE BUSINESS LOGIC
+            com.zn.renewable.entity.RenewablePricingConfig pricingConfig = renewablePricingConfigRepository.findById(pricingConfigId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pricing config not found with ID: " + pricingConfigId));
+            java.math.BigDecimal backendTotalPrice = pricingConfig.getTotalPrice();
+            Long unitAmountInCents = backendTotalPrice.multiply(new java.math.BigDecimal(100)).longValue();
+            request.setUnitAmount(unitAmountInCents); // Stripe expects cents
+
+            // Save registration record before payment (like optics)
+            RenewableRegistrationForm registrationForm = new RenewableRegistrationForm();
+            registrationForm.setName(request.getName() != null ? request.getName() : "");
+            registrationForm.setPhone(request.getPhone() != null ? request.getPhone() : "");
+            registrationForm.setEmail(request.getEmail());
+            registrationForm.setInstituteOrUniversity(request.getInstituteOrUniversity() != null ? request.getInstituteOrUniversity() : "");
+            registrationForm.setCountry(request.getCountry() != null ? request.getCountry() : "");
+            registrationForm.setPricingConfig(pricingConfig);
+            registrationForm.setAmountPaid(backendTotalPrice);
+            RenewableRegistrationForm savedRegistration = renewableRegistrationFormRepository.save(registrationForm);
+            log.info("✅ Renewable registration form created and saved with ID: {}", savedRegistration.getId());
+
             // Call renewable service - this will save to renewable_payment_records table
             RenewablePaymentResponseDTO response = renewableStripeService.createCheckoutSessionWithPricingValidation(request, pricingConfigId);
             log.info("Renewable checkout session created successfully. Session ID: {}", response.getSessionId());
             return ResponseEntity.ok(response);
-            
+
         } catch (IllegalArgumentException e) {
             log.error("Validation error creating renewable checkout session: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
