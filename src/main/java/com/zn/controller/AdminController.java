@@ -747,6 +747,139 @@ public ResponseEntity<?> recalculateAllNursingPricingConfigs() {
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to recalculate nursing pricing configs: " + e.getMessage());
 	}
 }
+	// Get all accommodation combos for each vertical (admin)
+	@GetMapping("/api/admin/accommodation/optics")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllOpticsAccommodations() {
+		try {
+			return ResponseEntity.ok(opticsAccommodationRepo.findAll());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve optics accommodations: " + e.getMessage(), e);
+		}
+	}
+
+	@GetMapping("/api/admin/accommodation/renewable")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllRenewableAccommodations() {
+		try {
+			return ResponseEntity.ok(renewableAccommodationRepo.findAll());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve renewable accommodations: " + e.getMessage(), e);
+		}
+	}
+
+	@GetMapping("/api/admin/accommodation/nursing")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllNursingAccommodations() {
+		try {
+			return ResponseEntity.ok(nursingAccommodationRepo.findAll());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve nursing accommodations: " + e.getMessage(), e);
+		}
+	}
+// --- Separate Edit APIs for Accommodation Combos ---
+	@PostMapping("/api/admin/accommodation/edit/optics/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> editOpticsAccommodationCombo(@PathVariable Long id, @RequestBody com.zn.optics.entity.OpticsAccommodation updated) {
+		try {
+			Optional<com.zn.optics.entity.OpticsAccommodation> optional = opticsAccommodationRepo.findById(id);
+			if (optional.isEmpty()) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Optics Accommodation not found with ID: " + id);
+			}
+			com.zn.optics.entity.OpticsAccommodation acc = optional.get();
+			acc.setNights(updated.getNights());
+			acc.setGuests(updated.getGuests());
+			acc.setPrice(updated.getPrice());
+			opticsAccommodationRepo.save(acc);
+			// Optionally update related pricing configs here
+			return ResponseEntity.ok("Optics accommodation updated successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update optics accommodation: " + e.getMessage());
+		}
+	}
+
+	@PostMapping("/api/admin/accommodation/edit/renewable/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> editRenewableAccommodationCombo(@PathVariable Long id, @RequestBody com.zn.renewable.entity.RenewableAccommodation updated) {
+		try {
+			Optional<com.zn.renewable.entity.RenewableAccommodation> optional = renewableAccommodationRepo.findById(id);
+			if (optional.isEmpty()) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Renewable Accommodation not found with ID: " + id);
+			}
+			com.zn.renewable.entity.RenewableAccommodation acc = optional.get();
+			acc.setNights(updated.getNights());
+			acc.setGuests(updated.getGuests());
+			acc.setPrice(updated.getPrice());
+			renewableAccommodationRepo.save(acc);
+			// Optionally update related pricing configs here
+			return ResponseEntity.ok("Renewable accommodation updated successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update renewable accommodation: " + e.getMessage());
+		}
+	}
+
+	@PostMapping("/api/admin/accommodation/edit/nursing/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> editNursingAccommodationCombo(@PathVariable Long id, @RequestBody com.zn.nursing.entity.NursingAccommodation updated) {
+		try {
+			Optional<com.zn.nursing.entity.NursingAccommodation> optional = nursingAccommodationRepo.findById(id);
+			if (optional.isEmpty()) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Nursing Accommodation not found with ID: " + id);
+			}
+			com.zn.nursing.entity.NursingAccommodation acc = optional.get();
+			acc.setNights(updated.getNights());
+			acc.setGuests(updated.getGuests());
+			acc.setPrice(updated.getPrice());
+			nursingAccommodationRepo.save(acc);
+			// Optionally update related pricing configs here
+			return ResponseEntity.ok("Nursing accommodation updated successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update nursing accommodation: " + e.getMessage());
+		}
+	}
+
+	// --- Separate Delete APIs for Accommodation Combos ---
+	@PostMapping("/api/admin/accommodation/delete/optics/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> deleteOpticsAccommodationCombo(@PathVariable Long id) {
+		try {
+			if (!opticsAccommodationRepo.existsById(id)) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Optics Accommodation not found with ID: " + id);
+			}
+			opticsAccommodationRepo.deleteById(id);
+			return ResponseEntity.ok("Optics accommodation deleted successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete optics accommodation: " + e.getMessage());
+		}
+	}
+
+	@PostMapping("/api/admin/accommodation/delete/renewable/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> deleteRenewableAccommodationCombo(@PathVariable Long id) {
+		try {
+			if (!renewableAccommodationRepo.existsById(id)) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Renewable Accommodation not found with ID: " + id);
+			}
+			renewableAccommodationRepo.deleteById(id);
+			return ResponseEntity.ok("Renewable accommodation deleted successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete renewable accommodation: " + e.getMessage());
+		}
+	}
+
+	@PostMapping("/api/admin/accommodation/delete/nursing/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> deleteNursingAccommodationCombo(@PathVariable Long id) {
+		try {
+			if (!nursingAccommodationRepo.existsById(id)) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Nursing Accommodation not found with ID: " + id);
+			}
+			nursingAccommodationRepo.deleteById(id);
+			return ResponseEntity.ok("Nursing accommodation deleted successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete nursing accommodation: " + e.getMessage());
+		}
+	}
 
 
 }
