@@ -1,3 +1,4 @@
+
 package com.zn.controller;
 
 
@@ -415,7 +416,67 @@ public ResponseEntity<?> getAllNursingAbstractSubmissions() {
 	}
 	// write a method to edit accomidation combo 
 	 
+	// Get all interested-in options for each vertical (admin)
+	@GetMapping("/api/admin/interested-in/optics")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllOpticsInterestedInOptions() {
+		try {
+			return ResponseEntity.ok(adminService.getAllOpticsInterestedInOptions());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve optics interested-in options: " + e.getMessage(), e);
+		}
+	}
 
+	@GetMapping("/api/admin/interested-in/renewable")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllRenewableInterestedInOptions() {
+		try {
+			return ResponseEntity.ok(adminService.getAllRenewableInterestedInOptions());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve renewable interested-in options: " + e.getMessage(), e);
+		}
+	}
+
+	@GetMapping("/api/admin/interested-in/nursing")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllNursingInterestedInOptions() {
+		try {
+			return ResponseEntity.ok(adminService.getAllNursingInterestedInOptions());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve nursing interested-in options: " + e.getMessage(), e);
+		}
+	}
+
+	// Get all session options for each vertical (admin)
+	@GetMapping("/api/admin/session-options/optics")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllOpticsSessionOptions() {
+		try {
+			return ResponseEntity.ok(adminService.getAllOpticsSessionOptions());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve optics session options: " + e.getMessage(), e);
+		}
+	}
+
+	@GetMapping("/api/admin/session-options/renewable")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllRenewableSessionOptions() {
+		try {
+			return ResponseEntity.ok(adminService.getAllRenewableSessionOptions());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve renewable session options: " + e.getMessage(), e);
+		}
+	}
+
+	@GetMapping("/api/admin/session-options/nursing")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllNursingSessionOptions() {
+		try {
+			return ResponseEntity.ok(adminService.getAllNursingSessionOptions());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve nursing session options: " + e.getMessage(), e);
+		}
+	}
 	
 
 // Edit accommodation combo for each vertical

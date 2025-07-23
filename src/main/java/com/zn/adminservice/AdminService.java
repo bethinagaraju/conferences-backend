@@ -354,6 +354,31 @@ public class AdminService {
 		return nursingRegistrationFormRepository.findAll();
 	}
 
+		// --- Admin API: Get all interested-in options for each vertical ---
+	public List<?> getAllOpticsInterestedInOptions() {
+		return opticsInterestedInOptionRepo.findAll();
+	}
+
+	public List<?> getAllRenewableInterestedInOptions() {
+		return renewableInterestedInOptionRepo.findAll();
+	}
+
+	public List<?> getAllNursingInterestedInOptions() {
+		return nursingInterestedInOptionRepo.findAll();
+	}
+
+	// --- Admin API: Get all session options for each vertical ---
+	public List<?> getAllOpticsSessionOptions() {
+		return opticsSessionOption.findAll();
+	}
+
+	public List<?> getAllRenewableSessionOptions() {
+		return renewableSessionOption.findAll();
+	}
+
+	public List<?> getAllNursingSessionOptions() {
+		return nursingSessionOption.findAll();
+	}
 
 // public List<Form> getAllAbstractSubmissions() {
 //     try {
