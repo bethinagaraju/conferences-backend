@@ -1,3 +1,4 @@
+
 package com.zn.payment.controller;
 
 import java.util.List;
@@ -151,7 +152,89 @@ public class PaymentRecordController {
             ));
         }
     }
+        // Get payment record by ID for Optics
+    @GetMapping("/optics/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getOpticsPaymentById(@PathVariable Long id) {
+        String adminUser = getCurrentAdminUser();
+        logger.info("ADMIN {}: Retrieving optics payment record by ID: {}", adminUser, id);
+        try {
+            Optional<OpticsPaymentRecord> payment = opticsPaymentRecordService.findById(id);
+            if (payment.isPresent()) {
+                return ResponseEntity.ok(PaymentResponseDTO.fromEntity(payment.get()));
+            } else {
+                return ResponseEntity.ok().body(Map.of(
+                    "message", "Optics payment record not found",
+                    "id", id,
+                    "website", "optics",
+                    "found", false
+                ));
+            }
+        } catch (Exception e) {
+            logger.error("ADMIN {}: Error retrieving optics payment by ID {}: {}", adminUser, id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "error", "Error retrieving optics payment record",
+                "message", e.getMessage(),
+                "website", "optics"
+            ));
+        }
+    }
 
+    // Get payment record by ID for Renewable
+    @GetMapping("/renewable/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getRenewablePaymentById(@PathVariable Long id) {
+        String adminUser = getCurrentAdminUser();
+        logger.info("ADMIN {}: Retrieving renewable payment record by ID: {}", adminUser, id);
+        try {
+            Optional<RenewablePaymentRecord> payment = renewablePaymentRecordService.findById(id);
+            if (payment.isPresent()) {
+                return ResponseEntity.ok(PaymentResponseDTO.fromEntity(payment.get()));
+            } else {
+                return ResponseEntity.ok().body(Map.of(
+                    "message", "Renewable payment record not found",
+                    "id", id,
+                    "website", "renewable",
+                    "found", false
+                ));
+            }
+        } catch (Exception e) {
+            logger.error("ADMIN {}: Error retrieving renewable payment by ID {}: {}", adminUser, id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "error", "Error retrieving renewable payment record",
+                "message", e.getMessage(),
+                "website", "renewable"
+            ));
+        }
+    }
+
+    // Get payment record by ID for Nursing
+    @GetMapping("/nursing/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getNursingPaymentById(@PathVariable Long id) {
+        String adminUser = getCurrentAdminUser();
+        logger.info("ADMIN {}: Retrieving nursing payment record by ID: {}", adminUser, id);
+        try {
+            Optional<NursingPaymentRecord> payment = nursingPaymentRecordService.findById(id);
+            if (payment.isPresent()) {
+                return ResponseEntity.ok(PaymentResponseDTO.fromEntity(payment.get()));
+            } else {
+                return ResponseEntity.ok().body(Map.of(
+                    "message", "Nursing payment record not found",
+                    "id", id,
+                    "website", "nursing",
+                    "found", false
+                ));
+            }
+        } catch (Exception e) {
+            logger.error("ADMIN {}: Error retrieving nursing payment by ID {}: {}", adminUser, id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "error", "Error retrieving nursing payment record",
+                "message", e.getMessage(),
+                "website", "nursing"
+            ));
+        }
+    }
     // Get payment records by customer email for Optics
     @GetMapping("/customer/optics/{email}")
     @PreAuthorize("hasRole('ADMIN')")
