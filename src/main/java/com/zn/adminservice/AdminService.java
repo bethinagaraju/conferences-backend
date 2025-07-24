@@ -1,4 +1,6 @@
 
+
+
 package com.zn.adminservice;
 
 import java.util.List;
@@ -467,5 +469,85 @@ public class AdminService {
 //         return null; // or handle the error appropriately
 //     }
 // }
+
+	// --- Edit and Delete Session Option for each vertical (admin) --- 
+	// Optics
+	public void editOpticsSession(Long id, String newSessionName) {
+		var optional = opticsSessionOption.findById(id);
+		if (optional == null || optional.isEmpty()) throw new DataProcessingException("Optics session option not found with ID: " + id);
+		var entity = optional.get();
+		setSessionOptionField(entity, newSessionName);
+		opticsSessionOption.save(entity);
+	}
+
+	public void deleteOpticsSession(Long id) {
+		if (id == null || !opticsSessionOption.existsById(id)) throw new DataProcessingException("Optics session option not found with ID: " + id);
+		opticsSessionOption.deleteById(id);
+	}
+
+	// Renewable
+	public void editRenewableSession(Long id, String newSessionName) {
+		var optional = renewableSessionOption.findById(id);
+		if (optional == null || optional.isEmpty()) throw new DataProcessingException("Renewable session option not found with ID: " + id);
+		var entity = optional.get();
+		setSessionOptionField(entity, newSessionName);
+		renewableSessionOption.save(entity);
+	}
+
+	public void deleteRenewableSession(Long id) {
+		if (id == null || !renewableSessionOption.existsById(id)) throw new DataProcessingException("Renewable session option not found with ID: " + id);
+		renewableSessionOption.deleteById(id);
+	}
+
+	// Nursing
+	public void editNursingSession(Long id, String newSessionName) {
+		var optional = nursingSessionOption.findById(id);
+		if (optional == null || optional.isEmpty()) throw new DataProcessingException("Nursing session option not found with ID: " + id);
+		var entity = optional.get();
+		setSessionOptionField(entity, newSessionName);
+		nursingSessionOption.save(entity);
+	}
+
+	public void deleteNursingSession(Long id) {
+		if (id == null || !nursingSessionOption.existsById(id)) throw new DataProcessingException("Nursing session option not found with ID: " + id);
+		nursingSessionOption.deleteById(id);
+	}
+
+	// Helper: set the session option field reflectively for all verticals
+	private void setSessionOptionField(Object entity, String value) {
+		try {
+			var method = entity.getClass().getMethod("setSessionName", String.class);
+			method.invoke(entity, value);
+			return;
+		} catch (Exception ignored) {}
+		try {
+			var method = entity.getClass().getMethod("setSessionOption", String.class);
+			method.invoke(entity, value);
+			return;
+		} catch (Exception ignored) {}
+		try {
+			var method = entity.getClass().getMethod("setName", String.class);
+			method.invoke(entity, value);
+			return;
+		} catch (Exception ignored) {}
+		// Try direct field access as last resort
+		try {
+			var field = entity.getClass().getDeclaredField("sessionName");
+			field.setAccessible(true);
+			field.set(entity, value);
+			return;
+		} catch (Exception ignored) {}
+		try {
+			var field = entity.getClass().getDeclaredField("sessionOption");
+			field.setAccessible(true);
+			field.set(entity, value);
+			return;
+		} catch (Exception ignored) {}
+		try {
+			var field = entity.getClass().getDeclaredField("name");
+			field.setAccessible(true);
+			field.set(entity, value);
+		} catch (Exception ignored) {}
+	}
 	
 }

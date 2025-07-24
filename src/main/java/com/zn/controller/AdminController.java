@@ -101,50 +101,50 @@ public class AdminController {	@Autowired
 		}
 	}
 		// insert Sessions in SessionOption table
-	// Optics session
-	@PostMapping("/sessions/optics")
-	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<String> insertOpticsSession(@RequestBody SessionOptionDTO dto) {
-		try {
-			if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
-				throw new IllegalArgumentException("Session option is required and cannot be empty");
-			}
-			String result = adminService.insertOpticsSession(dto.getSessionOption().trim());
-			return ResponseEntity.ok(result);
-		} catch (Exception e) {
-			throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
-		}
-	}
+	   // Optics session
+	   @PostMapping("/sessions/optics")
+	   @PreAuthorize("hasRole('ADMIN')")
+	   public ResponseEntity<String> insertOpticsSession(@RequestBody SessionOptionDTO dto) {
+			   try {
+					   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
+							   throw new IllegalArgumentException("Session option is required and cannot be empty");
+					   }
+					   String result = adminService.insertOpticsSession(dto.getSessionOption().trim());
+					   return ResponseEntity.ok(result);
+			   } catch (Exception e) {
+					   throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
+			   }
+	   }
 
-	// Renewable session
-	@PostMapping("/sessions/renewable")
-	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<String> insertRenewableSession(@RequestBody SessionOptionDTO dto) {
-		try {
-			if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
-				throw new IllegalArgumentException("Session option is required and cannot be empty");
-			}
-			String result = adminService.insertRenewableSession(dto.getSessionOption().trim());
-			return ResponseEntity.ok(result);
-		} catch (Exception e) {
-			throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
-		}
-	}
+	   // Renewable session
+	   @PostMapping("/sessions/renewable")
+	   @PreAuthorize("hasRole('ADMIN')")
+	   public ResponseEntity<String> insertRenewableSession(@RequestBody SessionOptionDTO dto) {
+			   try {
+					   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
+							   throw new IllegalArgumentException("Session option is required and cannot be empty");
+					   }
+					   String result = adminService.insertRenewableSession(dto.getSessionOption().trim());
+					   return ResponseEntity.ok(result);
+			   } catch (Exception e) {
+					   throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
+			   }
+	   }
 
-	// Nursing session
-	@PostMapping("/sessions/nursing")
-	@PreAuthorize("hasRole('ADMIN')")
-	public ResponseEntity<String> insertNursingSession(@RequestBody SessionOptionDTO dto) {
-		try {
-			if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
-				throw new IllegalArgumentException("Session option is required and cannot be empty");
-			}
-			String result = adminService.insertNursingSession(dto.getSessionOption().trim());
-			return ResponseEntity.ok(result);
-		} catch (Exception e) {
-			throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
-		}
-	}
+	   // Nursing session
+	   @PostMapping("/sessions/nursing")
+	   @PreAuthorize("hasRole('ADMIN')")
+	   public ResponseEntity<String> insertNursingSession(@RequestBody SessionOptionDTO dto) {
+			   try {
+					   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
+							   throw new IllegalArgumentException("Session option is required and cannot be empty");
+					   }
+					   String result = adminService.insertNursingSession(dto.getSessionOption().trim());
+					   return ResponseEntity.ok(result);
+			   } catch (Exception e) {
+					   throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
+			   }
+	   }
 	// Optics interested-in
 	@PostMapping("/interested-in/optics")
 	public ResponseEntity<String> insertOpticsInterestedInOption(@RequestBody InterestedInOptionDTO dto) {
@@ -423,6 +423,7 @@ public ResponseEntity<?> getAllNursingAbstractSubmissions() {
 		try {
 			return ResponseEntity.ok(adminService.getAllOpticsInterestedInOptions());
 		} catch (Exception e) {
+			
 			throw new DataProcessingException("Failed to retrieve optics interested-in options: " + e.getMessage(), e);
 		}
 	}
@@ -851,6 +852,82 @@ public ResponseEntity<?> recalculateAllNursingPricingConfigs() {
 			return ResponseEntity.ok("Nursing interested-in option deleted successfully.");
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete nursing interested-in option: " + e.getMessage());
+		}
+	}
+	
+	// --- Admin Session Option Edit/Delete (POST for compatibility) ---
+	@PostMapping("/api/admin/sessions/optics/{id}/edit")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> editOpticsSession(@PathVariable Long id, @RequestBody SessionOptionDTO dto) {
+		try {
+			if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
+				throw new IllegalArgumentException("Session option is required and cannot be empty");
+			}
+			adminService.editOpticsSession(id, dto.getSessionOption().trim());
+			return ResponseEntity.ok("Session option updated successfully (optics).");
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to update session option: " + e.getMessage(), e);
+		}
+	}
+
+	@PostMapping("/api/admin/sessions/optics/{id}/delete")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> deleteOpticsSession(@PathVariable Long id) {
+		try {
+			adminService.deleteOpticsSession(id);
+			return ResponseEntity.ok("Session option deleted successfully (optics).");
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to delete session option: " + e.getMessage(), e);
+		}
+	}
+
+	   @PostMapping("/api/admin/sessions/renewable/{id}/edit")
+	   @PreAuthorize("hasRole('ADMIN')")
+	   public ResponseEntity<?> editRenewableSession(@PathVariable Long id, @RequestBody SessionOptionDTO dto) {
+			   try {
+					   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
+							   throw new IllegalArgumentException("Session option is required and cannot be empty");
+					   }
+					   adminService.editRenewableSession(id, dto.getSessionOption().trim());
+					   return ResponseEntity.ok("Session option updated successfully (renewable).");
+			   } catch (Exception e) {
+					   throw new DataProcessingException("Failed to update session option: " + e.getMessage(), e);
+			   }
+	   }
+
+	@PostMapping("/api/admin/sessions/renewable/{id}/delete")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> deleteRenewableSession(@PathVariable Long id) {
+		try {
+			adminService.deleteRenewableSession(id);
+			return ResponseEntity.ok("Session option deleted successfully (renewable).");
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to delete session option: " + e.getMessage(), e);
+		}
+	}
+
+	   @PostMapping("/api/admin/sessions/nursing/{id}/edit")
+	   @PreAuthorize("hasRole('ADMIN')")
+	   public ResponseEntity<?> editNursingSession(@PathVariable Long id, @RequestBody SessionOptionDTO dto) {
+			   try {
+					   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
+							   throw new IllegalArgumentException("Session option is required and cannot be empty");
+					   }
+					   adminService.editNursingSession(id, dto.getSessionOption().trim());
+					   return ResponseEntity.ok("Session option updated successfully (nursing).");
+			   } catch (Exception e) {
+					   throw new DataProcessingException("Failed to update session option: " + e.getMessage(), e);
+			   }
+	   }
+
+	@PostMapping("/api/admin/sessions/nursing/{id}/delete")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> deleteNursingSession(@PathVariable Long id) {
+		try {
+			adminService.deleteNursingSession(id);
+			return ResponseEntity.ok("Session option deleted successfully (nursing).");
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to delete session option: " + e.getMessage(), e);
 		}
 	}
 
