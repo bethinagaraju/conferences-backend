@@ -51,6 +51,7 @@ public class AdminController {	@Autowired
 @Autowired private com.zn.optics.repository.IOpticsPricingConfigRepository opticsPricingConfigRepository;
 @Autowired private com.zn.renewable.repository.IRenewablePricingConfigRepository renewablePricingConfigRepository;
 @Autowired private com.zn.nursing.repository.INursingPricingConfigRepository nursingPricingConfigRepository;
+
 	// login admin	
 	@PostMapping("/api/admin/login")
 	public ResponseEntity<?> loginAdmin(@RequestBody AdminLoginRequestDTO loginRequest, HttpServletResponse response) {
@@ -792,6 +793,9 @@ public ResponseEntity<?> recalculateAllNursingPricingConfigs() {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update optics interested-in option: " + e.getMessage());
 		}
 	}
+	
+	// Get all discount records
+
 
 	@PostMapping("/api/admin/interested-in/edit/renewable/{id}")
 	@PreAuthorize("hasRole('ADMIN')")
@@ -894,6 +898,38 @@ public ResponseEntity<?> recalculateAllNursingPricingConfigs() {
 					   throw new DataProcessingException("Failed to update session option: " + e.getMessage(), e);
 			   }
 	   }
+	// Get all discount records for Optics
+	@GetMapping("/api/admin/discounts/optics")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllOpticsDiscounts() {
+		try {
+			return ResponseEntity.ok(adminService.getAllOpticsDiscounts());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve optics discounts: " + e.getMessage(), e);
+		}
+	}
+
+	// Get all discount records for Renewable
+	@GetMapping("/api/admin/discounts/renewable")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllRenewableDiscounts() {
+		try {
+			return ResponseEntity.ok(adminService.getAllRenewableDiscounts());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve renewable discounts: " + e.getMessage(), e);
+		}
+	}
+
+	// Get all discount records for Nursing
+	@GetMapping("/api/admin/discounts/nursing")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllNursingDiscounts() {
+		try {
+			return ResponseEntity.ok(adminService.getAllNursingDiscounts());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve nursing discounts: " + e.getMessage(), e);
+		}
+	}
 
 	@PostMapping("/api/admin/sessions/renewable/{id}/delete")
 	@PreAuthorize("hasRole('ADMIN')")

@@ -73,6 +73,12 @@ public class AdminService {
 	@Autowired private INursingFormSubmissionRepo nursingFormSubmissionRepo;
  @Autowired private IOpticsFormSubmissionRepo opticsFormSubmissionRepo;
  @Autowired private IRenewableFormSubmissionRepo renewableFormSubmissionRepo;
+	@Autowired
+	private com.zn.payment.nursing.repository.NursingDiscountsRepository nursingDiscountsRepository;
+	@Autowired
+	private com.zn.payment.optics.repository.OpticsDiscountsRepository opticsDiscountsRepository;
+@Autowired
+	private com.zn.payment.renewable.repository.RenewableDiscountsRepository renewableDiscountsRepository;
 
 	  private final RestTemplate restTemplate = new RestTemplate();
 
@@ -83,6 +89,7 @@ public class AdminService {
 	 * @throws DataProcessingException if registration fails
 	 */
 	public Admin registerAdmin(String mail, String password, String name, String role) {
+
 		// Validate input
 		if (mail == null || mail.trim().isEmpty()) {
 			throw new IllegalArgumentException("Email is required");
@@ -247,7 +254,17 @@ public class AdminService {
 		renewableAccommodationRepo.save(accommodation);
 		return "Accommodation inserted successfully (renewable).";
 	}
+		public List<?> getAllOpticsDiscounts() {
+		return opticsDiscountsRepository.findAll();
+	}
 
+	public List<?> getAllRenewableDiscounts() {
+		return renewableDiscountsRepository.findAll();
+	}
+
+	public List<?> getAllNursingDiscounts() {
+		return nursingDiscountsRepository.findAll();
+	}
 	// Nursing vertical
 	public String insertNursingAccommodation(com.zn.nursing.entity.NursingAccommodation accommodation) {
 		if (accommodation == null) {
