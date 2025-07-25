@@ -4,6 +4,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.zn.renewable.entity.RenewableForm;
 
-public interface IRenewableFromSubmissionRepo extends JpaRepository<RenewableForm,Long> {
+public interface IRenewableFormSubmissionRepo extends JpaRepository<RenewableForm,Long> {
 
 }

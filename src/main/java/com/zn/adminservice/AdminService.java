@@ -15,17 +15,23 @@ import com.zn.adminrepo.IAdminRepo;
 import com.zn.dto.AdminResponseDTO;
 import com.zn.exception.AdminAuthenticationException;
 import com.zn.exception.DataProcessingException;
+import com.zn.nursing.entity.NursingForm;
 import com.zn.nursing.repository.INursingAccommodationRepo;
+import com.zn.nursing.repository.INursingFormSubmissionRepo;
 import com.zn.nursing.repository.INursingIntrestedInOptionsRepo;
 import com.zn.nursing.repository.INursingPricingConfigRepository;
 import com.zn.nursing.repository.INursingRegistrationFormRepository;
 import com.zn.nursing.repository.INursingSessionOption;
+import com.zn.optics.entity.OpticsForm;
 import com.zn.optics.repository.IOpricsRegistrationFormRepository;
 import com.zn.optics.repository.IOpticsAccommodationRepo;
+import com.zn.optics.repository.IOpticsFormSubmissionRepo;
 import com.zn.optics.repository.IOpticsIntrestedInOptionsRepo;
 import com.zn.optics.repository.IOpticsPricingConfigRepository;
 import com.zn.optics.repository.IOpticsSessionOption;
+import com.zn.renewable.entity.RenewableForm;
 import com.zn.renewable.repository.IRenewableAccommodationRepo;
+import com.zn.renewable.repository.IRenewableFormSubmissionRepo;
 import com.zn.renewable.repository.IRenewableIntrestedInOptionsRepo;
 import com.zn.renewable.repository.IRenewablePricingConfigRepository;
 import com.zn.renewable.repository.IRenewableRegistrationFormRepository;
@@ -64,6 +70,10 @@ public class AdminService {
 	@Autowired private IRenewableAccommodationRepo renewableAccommodationRepo;
 	@Autowired private INursingAccommodationRepo nursingAccommodationRepo;
 	@Autowired private IAdminRepo adminRepo;	
+	@Autowired private INursingFormSubmissionRepo nursingFormSubmissionRepo;
+ @Autowired private IOpticsFormSubmissionRepo opticsFormSubmissionRepo;
+ @Autowired private IRenewableFormSubmissionRepo renewableFormSubmissionRepo;
+
 	  private final RestTemplate restTemplate = new RestTemplate();
 
 	/**
@@ -205,18 +215,18 @@ public class AdminService {
 	}
 
 	// Optics vertical
-	public List<com.zn.optics.entity.OpticsRegistrationForm> getAllOpticsFormSubmissions() {
-		return opticsRegistrationFormRepository.findAll();
+	public List<OpticsForm> getAllOpticsFormSubmissions() {
+		return opticsFormSubmissionRepo.findAll();
 	}
 
 	// Renewable vertical
-	public List<com.zn.renewable.entity.RenewableRegistrationForm> getAllRenewableFormSubmissions() {
-		return renewableRegistrationFormRepository.findAll();
+	public List<RenewableForm> getAllRenewableFormSubmissions() {
+		return renewableFormSubmissionRepo.findAll();
 	}
 
 	// Nursing vertical
-	public List<com.zn.nursing.entity.NursingRegistrationForm> getAllNursingFormSubmissions() {
-		return nursingRegistrationFormRepository.findAll();
+	public List<NursingForm> getAllNursingFormSubmissions() {
+		return nursingFormSubmissionRepo.findAll();
 	}
 
 

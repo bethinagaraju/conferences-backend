@@ -18,7 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.zn.dto.AbstractSubmissionRequestDTO;
 import com.zn.nursing.entity.NursingForm;
-import com.zn.nursing.repository.INursingFromSubmissionRepo;
+import com.zn.nursing.repository.INursingFormSubmissionRepo;
 import com.zn.nursing.repository.INursingIntrestedInOptionsRepo;
 import com.zn.nursing.repository.INursingSessionOption;
 
@@ -40,7 +40,7 @@ public class NursingFormSubmissionService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Autowired
-    private INursingFromSubmissionRepo formSubmissionRepo;
+    private INursingFormSubmissionRepo formSubmissionRepo;
 
     @Autowired
     private INursingIntrestedInOptionsRepo interestedInRepo;

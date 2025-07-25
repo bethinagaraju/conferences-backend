@@ -18,7 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.zn.dto.AbstractSubmissionRequestDTO;
 import com.zn.renewable.entity.RenewableForm;
-import com.zn.renewable.repository.IRenewableFromSubmissionRepo;
+import com.zn.renewable.repository.IRenewableFormSubmissionRepo;
 import com.zn.renewable.repository.IRenewableIntrestedInOptionsRepo;
 import com.zn.renewable.repository.IRenewableSessionOption;
 
@@ -40,7 +40,7 @@ public class  RenewableFormSubmissionService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Autowired
-    private IRenewableFromSubmissionRepo formSubmissionRepo;
+    private IRenewableFormSubmissionRepo formSubmissionRepo;
 
     @Autowired
     private IRenewableIntrestedInOptionsRepo interestedInRepo;

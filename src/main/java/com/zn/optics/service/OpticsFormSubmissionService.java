@@ -18,7 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.zn.dto.AbstractSubmissionRequestDTO;
 import com.zn.optics.entity.OpticsForm;
-import com.zn.optics.repository.IOpticsFromSubmissionRepo;
+import com.zn.optics.repository.IOpticsFormSubmissionRepo;
 import com.zn.optics.repository.IOpticsIntrestedInOptionsRepo;
 import com.zn.optics.repository.IOpticsSessionOption;
 
@@ -40,7 +40,7 @@ public class OpticsFormSubmissionService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Autowired
-    private IOpticsFromSubmissionRepo formSubmissionRepo;
+    private IOpticsFormSubmissionRepo formSubmissionRepo;
 
     @Autowired
     private IOpticsIntrestedInOptionsRepo interestedInRepo;
