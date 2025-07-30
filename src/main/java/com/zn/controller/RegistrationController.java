@@ -84,7 +84,10 @@ public class RegistrationController {
         } else if ((origin != null && origin.contains("globalrenewablemeet.com")) || 
                    (referer != null && referer.contains("globalrenewablemeet.com"))) {
             return "renewable";
-        } else {
+        }else if ((origin != null && origin.contains("polyscienceconference.com")) || 
+                   (referer != null && referer.contains("polyscienceconference.com"))) {
+            return "polymers";
+        }  else {
             // Default to nursing for backward compatibility
             return "nursing";
         }
@@ -143,6 +146,8 @@ public class RegistrationController {
                 return handleNursingRequest(request);
             case "renewable":
                 return handleRenewableRequest(request);
+            case "polymers":
+                return handlePolymersRequest(request);
             default:
                 log.warn("Unknown domain: {}, defaulting to nursing", domain);
                 return handleNursingRequest(request);
@@ -351,10 +356,25 @@ public class RegistrationController {
                 return handleNursingRegistration(request);
             case "renewable":
                 return handleRenewableRegistration(request);
+            case "polymers":
+                return handlePolymersRegistration(request);
             default:
                 log.warn("Unknown domain: {}, defaulting to nursing", domain);
                 return handleNursingRegistration(request);
         }
+    }
+
+    // --- POLYMERS LOGIC ---
+    private ResponseEntity<?> handlePolymersRequest(PriceCalculationRequestDTO request) {
+        log.info("Handling polymers pricing request - implementation needed");
+        // TODO: Implement actual logic for polymers pricing config lookup
+        return ResponseEntity.status(501).body("Polymers pricing config lookup not implemented yet.");
+    }
+
+    private ResponseEntity<?> handlePolymersRegistration(Object request) {
+        log.info("Handling polymers registration - implementation needed");
+        // TODO: Implement actual logic for polymers registration
+        return ResponseEntity.status(501).body("Polymers registration not implemented yet.");
     }
     
     private ResponseEntity<?> handleOpticsRegistration(Object request) {

@@ -1,15 +1,5 @@
 package com.zn.payment.optics.service;
 
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.stream.Collectors;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
 import com.google.gson.JsonSyntaxException;
 import com.stripe.Stripe;
 import com.stripe.exception.SignatureVerificationException;
@@ -22,11 +12,20 @@ import com.zn.payment.dto.CreateDiscountSessionRequest;
 import com.zn.payment.optics.entity.OpticsDiscounts;
 import com.zn.payment.optics.entity.OpticsPaymentRecord;
 import com.zn.payment.optics.repository.OpticsDiscountsRepository;
-
 import jakarta.servlet.http.HttpServletRequest;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 
 @Service
+@Slf4j
 public class OpticsDiscountsService {
       @Value("${stripe.api.secret.key}")
     private String secretKey;
@@ -39,10 +38,13 @@ public class OpticsDiscountsService {
 
     public Object createSession(CreateDiscountSessionRequest request) {
         // Validate request
+        log.info("[OpticsDiscountsService] Creating discount session for: name={}, email={}, amount={}, currency={}", request.getName(), request.getCustomerEmail(), request.getUnitAmount(), request.getCurrency());
         if (request.getUnitAmount() == null || request.getUnitAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("[OpticsDiscountsService] Invalid unit amount: {}", request.getUnitAmount());
             return Map.of("error", "Unit amount must be positive");
         }
         if (request.getCurrency() == null || request.getCurrency().isEmpty()) {
+            log.warn("[OpticsDiscountsService] Currency not provided");
             return Map.of("error", "Currency must be provided");
         }
 
@@ -51,7 +53,7 @@ public class OpticsDiscountsService {
         discount.setPhone(request.getPhone());
         discount.setInstituteOrUniversity(request.getInstituteOrUniversity());
         discount.setCountry(request.getCountry());
-        
+
         // Convert euro to cents for Stripe if currency is EUR
         long unitAmountCents;
         if ("EUR".equalsIgnoreCase(request.getCurrency())) {
@@ -65,7 +67,6 @@ public class OpticsDiscountsService {
 
         try {
             Stripe.apiKey = secretKey;
-            
             // Create metadata to identify this as a discount session
             Map<String, String> metadata = new HashMap<>();
             metadata.put("source", "discount-api");
@@ -81,7 +82,7 @@ public class OpticsDiscountsService {
             if (request.getCountry() != null) {
                 metadata.put("customerCountry", request.getCountry());
             }
-            
+            log.info("[OpticsDiscountsService] Creating Stripe session for {} (amount: {}, currency: {})", request.getCustomerEmail(), unitAmountCents, request.getCurrency());
             SessionCreateParams params = SessionCreateParams.builder()
                     .addPaymentMethodType(SessionCreateParams.PaymentMethodType.CARD)
                     .addLineItem(
@@ -109,6 +110,7 @@ public class OpticsDiscountsService {
 
             // Create the session
             Session session = Session.create(params);
+            log.info("[OpticsDiscountsService] Stripe session created: id={}, paymentIntent={}, status={}, paymentStatus={}", session.getId(), session.getPaymentIntent(), session.getStatus(), session.getPaymentStatus());
             // Set Stripe details after session creation
             discount.setSessionId(session.getId());
             discount.setPaymentIntentId(session.getPaymentIntent());
@@ -122,6 +124,7 @@ public class OpticsDiscountsService {
             }
             discount.setPaymentStatus(session.getPaymentStatus());
             discountsRepository.save(discount);
+            log.info("[OpticsDiscountsService] Discount record saved for sessionId: {}", session.getId());
 
             // Return payment link and details as a JSON object
             Map<String, Object> response = new HashMap<>();
@@ -132,6 +135,7 @@ public class OpticsDiscountsService {
             response.put("paymentStatus", session.getPaymentStatus());
             return response;
         } catch (StripeException e) {
+            log.error("[OpticsDiscountsService] Error creating Stripe session: {}", e.getMessage(), e);
             return Map.of("error", "Error creating session: " + e.getMessage());
         }
     }
@@ -206,30 +210,36 @@ public class OpticsDiscountsService {
      */
     public void processWebhookEvent(Event event) {
         String eventType = event.getType();
-        System.out.println("🎯 Processing optics discount webhook event: " + eventType);
-        
+        log.info("🎯 [OpticsDiscountsService][WEBHOOK] Processing optics discount webhook event: {}", eventType);
         try {
             switch (eventType) {
-                case "checkout.session.completed" -> handleDiscountCheckoutSessionCompleted(event);
-                case "payment_intent.succeeded" -> handleDiscountPaymentIntentSucceeded(event);
-                case "payment_intent.payment_failed" -> handleDiscountPaymentIntentFailed(event);
-                default -> System.out.println("ℹ️ Unhandled optics discount event type: " + eventType);
+                case "checkout.session.completed" -> {
+                    log.info("[OpticsDiscountsService][WEBHOOK] Handling event: checkout.session.completed");
+                    handleDiscountCheckoutSessionCompleted(event);
+                }
+                case "payment_intent.succeeded" -> {
+                    log.info("[OpticsDiscountsService][WEBHOOK] Handling event: payment_intent.succeeded");
+                    handleDiscountPaymentIntentSucceeded(event);
+                }
+                case "payment_intent.payment_failed" -> {
+                    log.info("[OpticsDiscountsService][WEBHOOK] Handling event: payment_intent.payment_failed");
+                    handleDiscountPaymentIntentFailed(event);
+                }
+                default -> log.warn("[OpticsDiscountsService][WEBHOOK] Unhandled event type: {}", eventType);
             }
         } catch (Exception e) {
-            System.err.println("❌ Error processing optics discount webhook event: " + e.getMessage());
+            log.error("❌ [OpticsDiscountsService][WEBHOOK] Error processing optics discount webhook event: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to process optics discount webhook event", e);
         }
     }
     
     private void handleDiscountCheckoutSessionCompleted(Event event) {
-        System.out.println("🎯 Handling optics discount checkout.session.completed");
-        
+        log.info("🎯 [OpticsDiscountsService][WEBHOOK] Handling optics discount checkout.session.completed");
         try {
             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                 com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
                 String sessionId = session.getId();
-                
                 // Find the discount record by session ID
                 OpticsDiscounts discount = discountsRepository.findBySessionId(sessionId);
                 if (discount != null) {
@@ -237,26 +247,24 @@ public class OpticsDiscountsService {
                     discount.setPaymentIntentId(session.getPaymentIntent());
                     discount.setUpdatedAt(java.time.LocalDateTime.now());
                     discountsRepository.save(discount);
-                    System.out.println("✅ Updated OpticsDiscounts status to COMPLETED for session: " + sessionId);
+                    log.info("[OpticsDiscountsService][WEBHOOK] Updated OpticsDiscounts status to COMPLETED for session: {}", sessionId);
                 } else {
-                    System.out.println("⚠️ No OpticsDiscounts record found for session: " + sessionId);
+                    log.warn("[OpticsDiscountsService][WEBHOOK] No OpticsDiscounts record found for session: {}", sessionId);
                 }
             }
         } catch (Exception e) {
-            System.err.println("❌ Error handling optics discount checkout.session.completed: " + e.getMessage());
+            log.error("❌ [OpticsDiscountsService][WEBHOOK] Error handling optics discount checkout.session.completed: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to handle optics discount checkout session completed", e);
         }
     }
     
     private void handleDiscountPaymentIntentSucceeded(Event event) {
-        System.out.println("🎯 Handling optics discount payment_intent.succeeded");
-        
+        log.info("🎯 [OpticsDiscountsService][WEBHOOK] Handling optics discount payment_intent.succeeded");
         try {
             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                 com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
                 String paymentIntentId = paymentIntent.getId();
-                
                 // Find the discount record by payment intent ID
                 java.util.Optional<OpticsDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
                 if (discountOpt.isPresent()) {
@@ -264,26 +272,24 @@ public class OpticsDiscountsService {
                     discount.setStatus(OpticsPaymentRecord.PaymentStatus.COMPLETED);
                     discount.setUpdatedAt(java.time.LocalDateTime.now());
                     discountsRepository.save(discount);
-                    System.out.println("✅ Updated OpticsDiscounts status to COMPLETED for payment intent: " + paymentIntentId);
+                    log.info("[OpticsDiscountsService][WEBHOOK] Updated OpticsDiscounts status to COMPLETED for payment intent: {}", paymentIntentId);
                 } else {
-                    System.out.println("⚠️ No OpticsDiscounts record found for payment intent: " + paymentIntentId);
+                    log.warn("[OpticsDiscountsService][WEBHOOK] No OpticsDiscounts record found for payment intent: {}", paymentIntentId);
                 }
             }
         } catch (Exception e) {
-            System.err.println("❌ Error handling optics discount payment_intent.succeeded: " + e.getMessage());
+            log.error("❌ [OpticsDiscountsService][WEBHOOK] Error handling optics discount payment_intent.succeeded: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to handle optics discount payment intent succeeded", e);
         }
     }
     
     private void handleDiscountPaymentIntentFailed(Event event) {
-        System.out.println("🎯 Handling optics discount payment_intent.payment_failed");
-        
+        log.info("🎯 [OpticsDiscountsService][WEBHOOK] Handling optics discount payment_intent.payment_failed");
         try {
             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                 com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
                 String paymentIntentId = paymentIntent.getId();
-                
                 // Find the discount record by payment intent ID
                 java.util.Optional<OpticsDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
                 if (discountOpt.isPresent()) {
@@ -291,13 +297,13 @@ public class OpticsDiscountsService {
                     discount.setStatus(OpticsPaymentRecord.PaymentStatus.FAILED);
                     discount.setUpdatedAt(java.time.LocalDateTime.now());
                     discountsRepository.save(discount);
-                    System.out.println("✅ Updated OpticsDiscounts status to FAILED for payment intent: " + paymentIntentId);
+                    log.info("[OpticsDiscountsService][WEBHOOK] Updated OpticsDiscounts status to FAILED for payment intent: {}", paymentIntentId);
                 } else {
-                    System.out.println("⚠️ No OpticsDiscounts record found for payment intent: " + paymentIntentId);
+                    log.warn("[OpticsDiscountsService][WEBHOOK] No OpticsDiscounts record found for payment intent: {}", paymentIntentId);
                 }
             }
         } catch (Exception e) {
-            System.err.println("❌ Error handling optics discount payment_intent.payment_failed: " + e.getMessage());
+            log.error("❌ [OpticsDiscountsService][WEBHOOK] Error handling optics discount payment_intent.payment_failed: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to handle optics discount payment intent failed", e);
         }
     }
@@ -305,27 +311,28 @@ public class OpticsDiscountsService {
      * Update payment status in OpticsDiscounts by Stripe session ID
      */
     public boolean updatePaymentStatusBySessionId(String sessionId, String status) {
+        log.info("[OpticsDiscountsService][WEBHOOK] Attempting to update payment status for sessionId: {} to {}", sessionId, status);
         OpticsDiscounts discount = discountsRepository.findBySessionId(sessionId);
         if (discount != null) {
-            System.out.println("[OpticsDiscountsService] Found discount for sessionId: " + sessionId);
-            System.out.println("[OpticsDiscountsService] Updating paymentStatus to: " + status);
+            log.info("[OpticsDiscountsService][WEBHOOK] Found discount for sessionId: {}", sessionId);
+            log.info("[OpticsDiscountsService][WEBHOOK] Previous paymentStatus: {}, Previous status(enum): {}", discount.getPaymentStatus(), discount.getStatus());
             discount.setPaymentStatus(status);
             try {
                 discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.valueOf(status.toUpperCase()));
             } catch (Exception e) {
-                System.out.println("[OpticsDiscountsService] Invalid status for enum: " + status + ", defaulting to PENDING");
+                log.warn("[OpticsDiscountsService][WEBHOOK] Invalid status for enum: {}, defaulting to PENDING", status);
                 discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.PENDING);
             }
             discount.setUpdatedAt(java.time.LocalDateTime.now());
             discountsRepository.save(discount);
-            System.out.println("[OpticsDiscountsService] Discount updated and saved for sessionId: " + sessionId);
+            log.info("[OpticsDiscountsService][WEBHOOK] Discount updated and saved for sessionId: {}. New paymentStatus: {}, New status(enum): {}", sessionId, discount.getPaymentStatus(), discount.getStatus());
             return true;
         } else {
-            System.out.println("[OpticsDiscountsService] No discount found for sessionId: " + sessionId);
+            log.warn("[OpticsDiscountsService][WEBHOOK] No discount found for sessionId: {}", sessionId);
             // Debug: print all session IDs in the table
-            System.out.println("[OpticsDiscountsService] Existing session IDs in table:");
+            log.info("[OpticsDiscountsService][WEBHOOK] Existing session IDs in table:");
             for (OpticsDiscounts d : discountsRepository.findAll()) {
-                System.out.println("  - " + d.getSessionId());
+                log.info("  - {}", d.getSessionId());
             }
         }
         return false;
@@ -335,28 +342,29 @@ public class OpticsDiscountsService {
      * Update payment status in OpticsDiscounts by Stripe payment intent ID
      */
     public boolean updatePaymentStatusByPaymentIntentId(String paymentIntentId, String status) {
+        log.info("[OpticsDiscountsService][WEBHOOK] Attempting to update payment status for paymentIntentId: {} to {}", paymentIntentId, status);
         java.util.Optional<OpticsDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
         if (discountOpt.isPresent()) {
             OpticsDiscounts discount = discountOpt.get();
-            System.out.println("[OpticsDiscountsService] Found discount for paymentIntentId: " + paymentIntentId);
-            System.out.println("[OpticsDiscountsService] Updating paymentStatus to: " + status);
+            log.info("[OpticsDiscountsService][WEBHOOK] Found discount for paymentIntentId: {}", paymentIntentId);
+            log.info("[OpticsDiscountsService][WEBHOOK] Previous paymentStatus: {}, Previous status(enum): {}", discount.getPaymentStatus(), discount.getStatus());
             discount.setPaymentStatus(status);
             try {
                 discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.valueOf(status.toUpperCase()));
             } catch (Exception e) {
-                System.out.println("[OpticsDiscountsService] Invalid status for enum: " + status + ", defaulting to PENDING");
+                log.warn("[OpticsDiscountsService][WEBHOOK] Invalid status for enum: {}, defaulting to PENDING", status);
                 discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.PENDING);
             }
             discount.setUpdatedAt(java.time.LocalDateTime.now());
             discountsRepository.save(discount);
-            System.out.println("[OpticsDiscountsService] Discount updated and saved for paymentIntentId: " + paymentIntentId);
+            log.info("[OpticsDiscountsService][WEBHOOK] Discount updated and saved for paymentIntentId: {}. New paymentStatus: {}, New status(enum): {}", paymentIntentId, discount.getPaymentStatus(), discount.getStatus());
             return true;
         } else {
-            System.out.println("[OpticsDiscountsService] No discount found for paymentIntentId: " + paymentIntentId);
+            log.warn("[OpticsDiscountsService][WEBHOOK] No discount found for paymentIntentId: {}", paymentIntentId);
             // Debug: print all payment intent IDs in the table
-            System.out.println("[OpticsDiscountsService] Existing paymentIntent IDs in table:");
+            log.info("[OpticsDiscountsService][WEBHOOK] Existing paymentIntent IDs in table:");
             for (OpticsDiscounts d : discountsRepository.findAll()) {
-                System.out.println("  - " + d.getPaymentIntentId());
+                log.info("  - {}", d.getPaymentIntentId());
             }
         }
         return false;
@@ -366,27 +374,27 @@ public class OpticsDiscountsService {
      * Find and update OpticsDiscounts record by a specific session ID, with logging.
      */
     public boolean findAndUpdateBySessionId(String sessionId, String newStatus) {
-        System.out.println("[OpticsDiscountsService] Searching for sessionId: " + sessionId);
+        log.info("[OpticsDiscountsService] Searching for sessionId: {}", sessionId);
         OpticsDiscounts discount = discountsRepository.findBySessionId(sessionId);
         if (discount != null) {
-            System.out.println("[OpticsDiscountsService] Found discount for sessionId: " + sessionId);
+            log.info("[OpticsDiscountsService] Found discount for sessionId: {}", sessionId);
             discount.setPaymentStatus(newStatus);
             try {
                 discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.valueOf(newStatus.toUpperCase()));
             } catch (Exception e) {
-                System.out.println("[OpticsDiscountsService] Invalid status for enum: " + newStatus + ", defaulting to PENDING");
+                log.warn("[OpticsDiscountsService] Invalid status for enum: {}, defaulting to PENDING", newStatus);
                 discount.setStatus(com.zn.payment.optics.entity.OpticsPaymentRecord.PaymentStatus.PENDING);
             }
             discount.setUpdatedAt(java.time.LocalDateTime.now());
             discountsRepository.save(discount);
-            System.out.println("[OpticsDiscountsService] Discount updated and saved for sessionId: " + sessionId);
+            log.info("[OpticsDiscountsService] Discount updated and saved for sessionId: {}", sessionId);
             return true;
         } else {
-            System.out.println("[OpticsDiscountsService] No discount found for sessionId: " + sessionId);
+            log.warn("[OpticsDiscountsService] No discount found for sessionId: {}", sessionId);
             // Debug: print all session IDs in the table
-            System.out.println("[OpticsDiscountsService] Existing session IDs in table:");
+            log.info("[OpticsDiscountsService] Existing session IDs in table:");
             for (OpticsDiscounts d : discountsRepository.findAll()) {
-                System.out.println("  - " + d.getSessionId());
+                log.info("  - {}", d.getSessionId());
             }
         }
         return false;

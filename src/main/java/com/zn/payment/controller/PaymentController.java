@@ -103,6 +103,7 @@ public class PaymentController {
     
     @Autowired
     private RenewableDiscountsRepository renewableDiscountsRepository;
+    
 
     @PostMapping("/create-checkout-session")
     public ResponseEntity<?> createCheckoutSession(@RequestBody CheckoutRequest request, @RequestParam Long pricingConfigId, HttpServletRequest httpRequest) {
@@ -260,41 +261,10 @@ public class PaymentController {
                     log.warn("[Webhook Debug] Could not extract productName/paymentType from event: {}", ex.getMessage());
                 }
 
-                // If paymentType is discount-registration, process only discount tables
+                // If paymentType is discount-registration, DO NOT process in this webhook (handled by /api/discounts/webhook)
                 if (paymentType != null && paymentType.equalsIgnoreCase("discount-registration")) {
-                    // log.info("[Webhook Debug] Detected discount-registration paymentType. Routing to discount services only.");
-                    boolean updated = false;
-                    String sessionId = null;
-                    try {
-                        java.util.Optional<com.stripe.model.StripeObject> sessionOpt = event.getDataObjectDeserializer().getObject();
-                        if (sessionOpt.isPresent() && sessionOpt.get() instanceof com.stripe.model.checkout.Session) {
-                            com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) sessionOpt.get();
-                            sessionId = session.getId();
-                        }
-                    } catch (Exception ex) {
-                        // log.warn("[Webhook Debug] Could not extract sessionId for discount: {}", ex.getMessage());
-                    }
-                    if (sessionId != null) {
-                        if (opticsDiscountsRepository.findBySessionId(sessionId) != null) {
-                            // log.info("Session found in OpticsDiscounts, updating status...");
-                            opticsDiscountsService.processWebhookEvent(event);
-                            updated = true;
-                        } else if (nursingDiscountsRepository.findBySessionId(sessionId) != null) {
-                            // log.info("Session found in NursingDiscounts, updating status...");
-                            nursingDiscountsService.processWebhookEvent(event);
-                            updated = true;
-                        } else if (renewableDiscountsRepository.findBySessionId(sessionId) != null) {
-                            // log.info("Session found in RenewableDiscounts, updating status...");
-                            renewableDiscountsService.processWebhookEvent(event);
-                            updated = true;
-                        }
-                    }
-                    if (updated) {
-                        return ResponseEntity.ok("Discount payment status updated in discount table");
-                    } else {
-                        // log.warn("[Webhook Debug] Discount session not found in any discount table. No table updated.");
-                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Discount session not found in any discount table. No table updated.");
-                    }
+                    log.info("[Webhook Debug] Skipping discount-registration paymentType in /api/payment/webhook. Only /api/discounts/webhook should process discount payments.");
+                    return ResponseEntity.ok("Discount payment ignored in payment webhook");
                 }
 
                 // 2. Try to extract productName for normal routing

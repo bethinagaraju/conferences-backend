@@ -1,4 +1,14 @@
-package com.zn.payment.renewable.service;
+package com.zn.payment.polymers.service;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import com.google.gson.JsonSyntaxException;
 import com.stripe.Stripe;
@@ -9,24 +19,56 @@ import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.param.checkout.SessionCreateParams;
 import com.zn.payment.dto.CreateDiscountSessionRequest;
-import com.zn.payment.renewable.entity.RenewableDiscounts;
-import com.zn.payment.renewable.entity.RenewablePaymentRecord;
-import com.zn.payment.renewable.repository.RenewableDiscountsRepository;
+import com.zn.payment.nursing.entity.NursingDiscounts;
+import com.zn.payment.nursing.entity.NursingPaymentRecord;
+import com.zn.payment.nursing.entity.NursingPaymentRecord.PaymentStatus;
+import com.zn.payment.nursing.repository.NursingDiscountsRepository;
+
 import jakarta.servlet.http.HttpServletRequest;
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 
 
 @Service
 @Slf4j
-public class RenewableDiscountsService {
+public class PolymersDiscountsService {
+    /**
+     * Update payment status in NursingDiscounts by Stripe session ID
+     */
+    public boolean updatePaymentStatusBySessionId(String sessionId, String status) {
+        log.info("[PolymersDiscountsService][WEBHOOK] Attempting to update payment status for sessionId: {} to {}", sessionId, status);
+        NursingDiscounts discount = discountsRepository.findBySessionId(sessionId);
+        if (discount != null) {
+            log.info("[PolymersDiscountsService][WEBHOOK] Found discount for sessionId: {}", sessionId);
+            log.info("[PolymersDiscountsService][WEBHOOK] Updating paymentStatus to: {}", status);
+            discount.setPaymentStatus(status);
+            discountsRepository.save(discount);
+            log.info("[PolymersDiscountsService][WEBHOOK] Discount updated and saved for sessionId: {}", sessionId);
+            return true;
+        } else {
+            log.warn("[PolymersDiscountsService][WEBHOOK] No discount found for sessionId: {}", sessionId);
+        }
+        return false;
+    }
+
+    /**
+     * Update payment status in NursingDiscounts by Stripe payment intent ID
+     */
+    public boolean updatePaymentStatusByPaymentIntentId(String paymentIntentId, String status) {
+        log.info("[PolymersDiscountsService][WEBHOOK] Attempting to update payment status for paymentIntentId: {} to {}", paymentIntentId, status);
+        java.util.Optional<NursingDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+        if (discountOpt.isPresent()) {
+            NursingDiscounts discount = discountOpt.get();
+            log.info("[PolymersDiscountsService][WEBHOOK] Found discount for paymentIntentId: {}", paymentIntentId);
+            log.info("[PolymersDiscountsService][WEBHOOK] Updating paymentStatus to: {}", status);
+            discount.setPaymentStatus(status);
+            discountsRepository.save(discount);
+            log.info("[PolymersDiscountsService][WEBHOOK] Discount updated and saved for paymentIntentId: {}", paymentIntentId);
+            return true;
+        } else {
+            log.warn("[PolymersDiscountsService][WEBHOOK] No discount found for paymentIntentId: {}", paymentIntentId);
+        }
+        return false;
+    }
       @Value("${stripe.api.secret.key}")
     private String secretKey;
 
@@ -34,7 +76,7 @@ public class RenewableDiscountsService {
     private String webhookSecret;
 
     @Autowired
-    private RenewableDiscountsRepository discountsRepository;
+    private NursingDiscountsRepository discountsRepository;
 
     public Object createSession(CreateDiscountSessionRequest request) {
         // Validate request
@@ -45,7 +87,7 @@ public class RenewableDiscountsService {
             return Map.of("error", "Currency must be provided");
         }
 
-        RenewableDiscounts discount = new RenewableDiscounts();
+        NursingDiscounts discount = new NursingDiscounts();
         discount.setName(request.getName());
         discount.setPhone(request.getPhone());
         discount.setInstituteOrUniversity(request.getInstituteOrUniversity());
@@ -136,34 +178,34 @@ public class RenewableDiscountsService {
     }
 
     // Helper for robust enum mapping
-    private com.zn.payment.renewable.entity.RenewablePaymentRecord.PaymentStatus safeMapStripeStatus(String status) {
-        if (status == null) return com.zn.payment.renewable.entity.RenewablePaymentRecord.PaymentStatus.PENDING;
+    private PaymentStatus safeMapStripeStatus(String status) {
+        if (status == null) return PaymentStatus.PENDING;
         try {
-            return com.zn.payment.renewable.entity.RenewablePaymentRecord.PaymentStatus.valueOf(status.toUpperCase());
+            return PaymentStatus.valueOf(status.toUpperCase());
         } catch (IllegalArgumentException ex) {
-            return com.zn.payment.renewable.entity.RenewablePaymentRecord.PaymentStatus.PENDING;
+            return PaymentStatus.PENDING;
         }
     }
     public Object handleStripeWebhook(HttpServletRequest request) throws IOException {
         String payload = request.getReader().lines().collect(Collectors.joining(System.lineSeparator()));
         String sigHeader = request.getHeader("Stripe-Signature");
 
-        log.info("[RenewableDiscountsService][WEBHOOK] Received Stripe webhook. Signature header present: {}", sigHeader != null);
+        log.info("[PolymersDiscountsService][WEBHOOK] Received Stripe webhook. Signature header present: {}", sigHeader != null);
         if (sigHeader == null || sigHeader.isEmpty()) {
-            log.error("[RenewableDiscountsService][WEBHOOK] Missing Stripe-Signature header in webhook");
+            log.error("[PolymersDiscountsService][WEBHOOK] Missing Stripe-Signature header in webhook");
             return Map.of("error", "Missing signature header");
         }
         try {
             // Verify the webhook signature
             Event event = Webhook.constructEvent(payload, sigHeader, webhookSecret);
-            log.info("[RenewableDiscountsService][WEBHOOK] Webhook event type: {}", event.getType());
+            log.info("[PolymersDiscountsService][WEBHOOK] Webhook event type: {}", event.getType());
 
             // Handle the event
             if ("checkout.session.completed".equals(event.getType())) {
                 Session session = (Session) event.getData().getObject();
                 String sessionId = session.getId();
-                log.info("[RenewableDiscountsService][WEBHOOK] Processing checkout.session.completed for sessionId: {}", sessionId);
-                RenewableDiscounts discount = discountsRepository.findBySessionId(sessionId);
+                log.info("[PolymersDiscountsService][WEBHOOK] Processing checkout.session.completed for sessionId: {}", sessionId);
+                NursingDiscounts discount = discountsRepository.findBySessionId(sessionId);
                 if (discount != null) {
                     discount.setStatus(safeMapStripeStatus(session.getStatus()));
                     discount.setPaymentStatus(session.getPaymentStatus());
@@ -177,28 +219,28 @@ public class RenewableDiscountsService {
                         discount.setStripeExpiresAt(java.time.LocalDateTime.ofEpochSecond(session.getExpiresAt(), 0, java.time.ZoneOffset.UTC));
                     }
                     discountsRepository.save(discount);
-                    log.info("[RenewableDiscountsService][WEBHOOK] Discount updated and saved for sessionId: {}", sessionId);
+                    log.info("[PolymersDiscountsService][WEBHOOK] Discount updated and saved for sessionId: {}", sessionId);
                     return Map.of(
                         "message", "Discounts record updated for sessionId: " + sessionId,
                         "status", session.getStatus(),
                         "paymentStatus", session.getPaymentStatus()
                     );
                 } else {
-                    log.warn("[RenewableDiscountsService][WEBHOOK] No discount found for sessionId: {}", sessionId);
+                    log.warn("[PolymersDiscountsService][WEBHOOK] No discount found for sessionId: {}", sessionId);
                     return Map.of("error", "No Discounts record found for sessionId: " + sessionId);
                 }
             } else {
-                log.info("[RenewableDiscountsService][WEBHOOK] Unhandled event type: {}", event.getType());
+                log.info("[PolymersDiscountsService][WEBHOOK] Unhandled event type: {}", event.getType());
                 return Map.of("message", "Unhandled event type: " + event.getType());
             }
         } catch (SignatureVerificationException e) {
-            log.error("[RenewableDiscountsService][WEBHOOK] Webhook signature verification failed: {}", e.getMessage(), e);
+            log.error("[PolymersDiscountsService][WEBHOOK] Webhook signature verification failed: {}", e.getMessage(), e);
             return Map.of("error", "Webhook signature verification failed: " + e.getMessage());
         } catch (JsonSyntaxException e) {
-            log.error("[RenewableDiscountsService][WEBHOOK] Invalid JSON payload: {}", e.getMessage(), e);
+            log.error("[PolymersDiscountsService][WEBHOOK] Invalid JSON payload: {}", e.getMessage(), e);
             return Map.of("error", "Invalid JSON payload: " + e.getMessage());
         } catch (Exception e) {
-            log.error("[RenewableDiscountsService][WEBHOOK] Error processing webhook: {}", e.getMessage(), e);
+            log.error("[PolymersDiscountsService][WEBHOOK] Error processing webhook: {}", e.getMessage(), e);
             return Map.of("error", "Error processing webhook: " + e.getMessage());
         }
     }
@@ -215,7 +257,7 @@ public class RenewableDiscountsService {
      */
     public void processWebhookEvent(Event event) {
         String eventType = event.getType();
-        log.info("🎯 [RenewableDiscountsService][WEBHOOK] Processing renewable discount webhook event: {}", eventType);
+        log.info("🎯 [PolymersDiscountsService][WEBHOOK] Processing polymers discount webhook event: {}", eventType);
         try {
             switch (eventType) {
                 case "checkout.session.completed":
@@ -228,125 +270,86 @@ public class RenewableDiscountsService {
                     handleDiscountPaymentIntentFailed(event);
                     break;
                 default:
-                    log.info("ℹ️ [RenewableDiscountsService][WEBHOOK] Unhandled renewable discount event type: {}", eventType);
+                    log.info("ℹ️ [PolymersDiscountsService][WEBHOOK] Unhandled polymers discount event type: {}", eventType);
             }
         } catch (Exception e) {
-            log.error("❌ [RenewableDiscountsService][WEBHOOK] Error processing renewable discount webhook event: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to process renewable discount webhook event", e);
+            log.error("❌ [PolymersDiscountsService][WEBHOOK] Error processing polymers discount webhook event: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to process polymers discount webhook event", e);
         }
     }
     
     private void handleDiscountCheckoutSessionCompleted(Event event) {
-        log.info("🎯 [RenewableDiscountsService][WEBHOOK] Handling renewable discount checkout.session.completed");
+        log.info("🎯 [PolymersDiscountsService][WEBHOOK] Handling polymers discount checkout.session.completed");
         try {
             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                 com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
                 String sessionId = session.getId();
                 // Find the discount record by session ID
-                RenewableDiscounts discount = discountsRepository.findBySessionId(sessionId);
+                NursingDiscounts discount = discountsRepository.findBySessionId(sessionId);
                 if (discount != null) {
-                    discount.setStatus(RenewablePaymentRecord.PaymentStatus.COMPLETED);
+                    discount.setStatus(NursingPaymentRecord.PaymentStatus.COMPLETED);
                     discount.setPaymentIntentId(session.getPaymentIntent());
                     discount.setUpdatedAt(java.time.LocalDateTime.now());
                     discountsRepository.save(discount);
-                    log.info("✅ [RenewableDiscountsService][WEBHOOK] Updated RenewableDiscounts status to COMPLETED for session: {}", sessionId);
+                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated NursingDiscounts status to SUCCEEDED for session: {}", sessionId);
                 } else {
-                    log.warn("⚠️ [RenewableDiscountsService][WEBHOOK] No RenewableDiscounts record found for session: {}", sessionId);
+                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No NursingDiscounts record found for session: {}", sessionId);
                 }
             }
         } catch (Exception e) {
-            log.error("❌ [RenewableDiscountsService][WEBHOOK] Error handling renewable discount checkout.session.completed: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to handle renewable discount checkout session completed", e);
+            log.error("❌ [PolymersDiscountsService][WEBHOOK] Error handling polymers discount checkout.session.completed: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to handle polymers discount checkout session completed", e);
         }
     }
     
     private void handleDiscountPaymentIntentSucceeded(Event event) {
-        log.info("🎯 [RenewableDiscountsService][WEBHOOK] Handling renewable discount payment_intent.succeeded");
+        log.info("🎯 [PolymersDiscountsService][WEBHOOK] Handling polymers discount payment_intent.succeeded");
         try {
             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                 com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
                 String paymentIntentId = paymentIntent.getId();
                 // Find the discount record by payment intent ID
-                java.util.Optional<RenewableDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+                java.util.Optional<NursingDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
                 if (discountOpt.isPresent()) {
-                    RenewableDiscounts discount = discountOpt.get();
-                    discount.setStatus(RenewablePaymentRecord.PaymentStatus.COMPLETED);
+                    NursingDiscounts discount = discountOpt.get();
+                    discount.setStatus(NursingPaymentRecord.PaymentStatus.COMPLETED);
                     discount.setUpdatedAt(java.time.LocalDateTime.now());
                     discountsRepository.save(discount);
-                    log.info("✅ [RenewableDiscountsService][WEBHOOK] Updated RenewableDiscounts status to COMPLETED for payment intent: {}", paymentIntentId);
+                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated NursingDiscounts status to COMPLETED for payment intent: {}", paymentIntentId);
                 } else {
-                    log.warn("⚠️ [RenewableDiscountsService][WEBHOOK] No RenewableDiscounts record found for payment intent: {}", paymentIntentId);
+                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No NursingDiscounts record found for payment intent: {}", paymentIntentId);
                 }
             }
         } catch (Exception e) {
-            log.error("❌ [RenewableDiscountsService][WEBHOOK] Error handling renewable discount payment_intent.succeeded: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to handle renewable discount payment intent succeeded", e);
+            log.error("❌ [PolymersDiscountsService][WEBHOOK] Error handling polymers discount payment_intent.succeeded: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to handle polymers discount payment intent succeeded", e);
         }
     }
     
     private void handleDiscountPaymentIntentFailed(Event event) {
-        log.info("🎯 [RenewableDiscountsService][WEBHOOK] Handling renewable discount payment_intent.payment_failed");
+        log.info("🎯 [PolymersDiscountsService][WEBHOOK] Handling polymers discount payment_intent.payment_failed");
         try {
             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                 com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
                 String paymentIntentId = paymentIntent.getId();
                 // Find the discount record by payment intent ID
-                java.util.Optional<RenewableDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+                java.util.Optional<NursingDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
                 if (discountOpt.isPresent()) {
-                    RenewableDiscounts discount = discountOpt.get();
-                    discount.setStatus(RenewablePaymentRecord.PaymentStatus.FAILED);
+                    NursingDiscounts discount = discountOpt.get();
+                    discount.setStatus(NursingPaymentRecord.PaymentStatus.FAILED);
                     discount.setUpdatedAt(java.time.LocalDateTime.now());
                     discountsRepository.save(discount);
-                    log.info("✅ [RenewableDiscountsService][WEBHOOK] Updated RenewableDiscounts status to FAILED for payment intent: {}", paymentIntentId);
+                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated NursingDiscounts status to FAILED for payment intent: {}", paymentIntentId);
                 } else {
-                    log.warn("⚠️ [RenewableDiscountsService][WEBHOOK] No RenewableDiscounts record found for payment intent: {}", paymentIntentId);
+                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No NursingDiscounts record found for payment intent: {}", paymentIntentId);
                 }
             }
         } catch (Exception e) {
-            log.error("❌ [RenewableDiscountsService][WEBHOOK] Error handling renewable discount payment_intent.payment_failed: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to handle renewable discount payment intent failed", e);
+            log.error("❌ [PolymersDiscountsService][WEBHOOK] Error handling polymers discount payment_intent.payment_failed: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to handle polymers discount payment intent failed", e);
         }
-    }
-    
-    /**
-     * Update payment status in RenewableDiscounts by Stripe session ID
-     */
-    public boolean updatePaymentStatusBySessionId(String sessionId, String status) {
-        log.info("[RenewableDiscountsService][WEBHOOK] Attempting to update payment status for sessionId: {} to {}", sessionId, status);
-        RenewableDiscounts discount = discountsRepository.findBySessionId(sessionId);
-        if (discount != null) {
-            log.info("[RenewableDiscountsService][WEBHOOK] Found discount for sessionId: {}", sessionId);
-            log.info("[RenewableDiscountsService][WEBHOOK] Updating paymentStatus to: {}", status);
-            discount.setPaymentStatus(status);
-            discountsRepository.save(discount);
-            log.info("[RenewableDiscountsService][WEBHOOK] Discount updated and saved for sessionId: {}", sessionId);
-            return true;
-        } else {
-            log.warn("[RenewableDiscountsService][WEBHOOK] No discount found for sessionId: {}", sessionId);
-        }
-        return false;
-    }
-
-    /**
-     * Update payment status in RenewableDiscounts by Stripe payment intent ID
-     */
-    public boolean updatePaymentStatusByPaymentIntentId(String paymentIntentId, String status) {
-        log.info("[RenewableDiscountsService][WEBHOOK] Attempting to update payment status for paymentIntentId: {} to {}", paymentIntentId, status);
-        java.util.Optional<RenewableDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
-        if (discountOpt.isPresent()) {
-            RenewableDiscounts discount = discountOpt.get();
-            log.info("[RenewableDiscountsService][WEBHOOK] Found discount for paymentIntentId: {}", paymentIntentId);
-            log.info("[RenewableDiscountsService][WEBHOOK] Updating paymentStatus to: {}", status);
-            discount.setPaymentStatus(status);
-            discountsRepository.save(discount);
-            log.info("[RenewableDiscountsService][WEBHOOK] Discount updated and saved for paymentIntentId: {}", paymentIntentId);
-            return true;
-        } else {
-            log.warn("[RenewableDiscountsService][WEBHOOK] No discount found for paymentIntentId: {}", paymentIntentId);
-        }
-        return false;
     }
 }

@@ -11,7 +11,7 @@ import com.zn.dto.ContactFormDto;
 import com.zn.nursing.service.NursingEmailService;
 import com.zn.optics.service.OpticsEmailService;
 import com.zn.renewable.service.RenewableEmailService;
-
+import com.zn.polymers.service.PolymersEmailService;
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
@@ -28,6 +28,9 @@ public class ContactController {
     @Autowired
     private RenewableEmailService renewableEmailService;
 
+    @Autowired
+    private PolymersEmailService polymersEmailService;
+
     @PostMapping
     public String sendContactMessage(@RequestBody ContactFormDto dto, HttpServletRequest request) {
         String origin = request.getHeader("Origin");
@@ -41,7 +44,12 @@ public class ContactController {
                 nursingEmailService.sendContactMessage(dto.getName(), dto.getEmail(), dto.getSubject(), dto.getMessage());
             } else if (origin.contains("globalrenewablemeet.com")) {
                 renewableEmailService.sendContactMessage(dto.getName(), dto.getEmail(), dto.getSubject(), dto.getMessage());
-            } else {
+
+            } else if (origin.contains("polyscienceconference.com")){
+                polymersEmailService.sendContactMessage(dto.getName(), dto.getEmail(), dto.getSubject(), dto.getMessage());
+                
+            } 
+            else {
                 throw new IllegalArgumentException("Unknown frontend domain: " + origin);
             }
         } else {

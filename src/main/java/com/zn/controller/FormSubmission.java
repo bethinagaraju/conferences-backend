@@ -14,7 +14,7 @@ import com.zn.dto.AbstractSubmissionRequestDTO;
 import com.zn.nursing.service.NursingFormSubmissionService;
 import com.zn.optics.service.OpticsFormSubmissionService;
 import com.zn.renewable.service.RenewableFormSubmissionService;
-
+import com.zn.polymers.service.PolymersFormSubmissionService;
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
@@ -34,7 +34,8 @@ public class FormSubmission {
 	private RenewableFormSubmissionService renewableFormSubmissionService;
 	
 	
-	
+	@Autowired
+	private PolymersFormSubmissionService polymersFormSubmissionService;
 	
 	// handle form submission logic here
 	@PostMapping("/submit")
@@ -53,7 +54,10 @@ public class FormSubmission {
 				nursingFormSubmissionService.saveSubmission(request);
 			} else if (origin.contains("globalrenewablemeet.com")) {
 				renewableFormSubmissionService.saveSubmission(request);
-			} else {
+			}else if (origin.contains("polyscienceconference.com")) {
+				polymersFormSubmissionService.saveSubmission(request);
+			} 
+			else {
 				return ResponseEntity.badRequest().body("Unknown frontend domain: " + origin);
 			}
 		} else {
@@ -77,6 +81,8 @@ public class FormSubmission {
 				interestedInOptions = nursingFormSubmissionService.getInterestedInOptions();
 			} else if (origin.contains("globalrenewablemeet.com")) {
 				interestedInOptions = renewableFormSubmissionService.getInterestedInOptions();
+			} else if (origin.contains("polyscienceconference.com")) {
+				interestedInOptions = polymersFormSubmissionService.getInterestedInOptions();
 			} else {
 				return ResponseEntity.badRequest().body("Unknown frontend domain: " + origin);
 			}
@@ -100,6 +106,8 @@ public class FormSubmission {
 				sessionOptions = nursingFormSubmissionService.getSessionOptions();
 			} else if (origin.contains("globalrenewablemeet.com")) {
 				sessionOptions = renewableFormSubmissionService.getSessionOptions();
+			} else if (origin.contains("polyscienceconference.com")) {
+				sessionOptions = polymersFormSubmissionService.getSessionOptions();
 			} else {
 				return ResponseEntity.badRequest().body("Unknown frontend domain: " + origin);
 			}

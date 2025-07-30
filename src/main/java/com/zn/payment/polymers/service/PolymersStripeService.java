@@ -1,4 +1,4 @@
-package com.zn.payment.nursing.service;
+package com.zn.payment.polymers.service;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -23,16 +23,16 @@ import com.stripe.model.EventDataObjectDeserializer;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.param.checkout.SessionCreateParams;
-import com.zn.nursing.entity.NursingPricingConfig;
-import com.zn.nursing.entity.NursingRegistrationForm;
-import com.zn.nursing.repository.INursingPricingConfigRepository;
-import com.zn.nursing.repository.INursingRegistrationFormRepository;
 import com.zn.payment.dto.CheckoutRequest;
-import com.zn.payment.dto.NursingPaymentResponseDTO;
-import com.zn.payment.nursing.entity.NursingDiscounts;
-import com.zn.payment.nursing.entity.NursingPaymentRecord;
-import com.zn.payment.nursing.repository.NursingDiscountsRepository;
-import com.zn.payment.nursing.repository.NursingPaymentRecordRepository;
+import com.zn.payment.polymers.dto.PolymersPaymentResponseDTO;
+import com.zn.payment.polymers.entity.PolymersDiscounts;
+import com.zn.payment.polymers.entity.PolymersPaymentRecord;
+import com.zn.payment.polymers.repository.PolymersDiscountsRepository;
+import com.zn.payment.polymers.repository.PolymersPaymentRecordRepository;
+import com.zn.polymers.entity.PolymersPricingConfig;
+import com.zn.polymers.entity.PolymersRegistrationForm;
+import com.zn.polymers.repository.IPolymersPricingConfigRepository;
+import com.zn.polymers.repository.IPolymersRegistrationFormRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -70,7 +70,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Service
 @Slf4j
-public class NursingStripeService {
+public class PolymersStripeService {
     private static final ZoneId US_ZONE = ZoneId.of("America/New_York");
 
     @Value("${stripe.api.secret.key}")
@@ -80,16 +80,16 @@ public class NursingStripeService {
     private String endpointSecret;
     
     @Autowired
-    private NursingPaymentRecordRepository paymentRecordRepository;
+    private PolymersPaymentRecordRepository paymentRecordRepository;
 
     @Autowired
-    private INursingPricingConfigRepository pricingConfigRepository;
+    private IPolymersPricingConfigRepository pricingConfigRepository;
 
     @Autowired
-    private INursingRegistrationFormRepository registrationFormRepository;
+    private IPolymersRegistrationFormRepository registrationFormRepository;
     
     @Autowired
-    private NursingDiscountsRepository discountsRepository;
+    private PolymersDiscountsRepository discountsRepository;
     
     private LocalDateTime convertToLocalDateTime(Long timestamp) {
         if (timestamp == null) return null;
@@ -107,7 +107,7 @@ public class NursingStripeService {
      * This implements the constraint that discount table should be updated whenever payment record changes
      * Now uses database sync function for better consistency
      */
-    private void autoSyncDiscountOnPaymentUpdate(NursingPaymentRecord paymentRecord) {
+    private void autoSyncDiscountOnPaymentUpdate(PolymersPaymentRecord paymentRecord) {
         if (paymentRecord == null || paymentRecord.getSessionId() == null) {
             log.warn("⚠️ Cannot auto-sync discount: payment record or session ID is null");
             return;
@@ -118,25 +118,25 @@ public class NursingStripeService {
         
         try {
             // Call database sync function - this replaces the manual field copying
-            String syncResult = paymentRecordRepository.syncNursingBySessionId(paymentRecord.getSessionId());
+            String syncResult = paymentRecordRepository.syncPolymersBySessionId(paymentRecord.getSessionId());
             log.info("✅ Database sync result: {}", syncResult);
             
             // Fallback to manual sync if database function indicates no discount record exists
-            if (syncResult != null && syncResult.contains("Only nursing payment record exists")) {
-                log.info("📝 Creating new NursingDiscounts record for session: {}", paymentRecord.getSessionId());
-                NursingDiscounts discount = new NursingDiscounts();
+            if (syncResult != null && syncResult.contains("Only Polymers payment record exists")) {
+                log.info("📝 Creating new PolymersDiscounts record for session: {}", paymentRecord.getSessionId());
+                PolymersDiscounts discount = new PolymersDiscounts();
                 discount.setSessionId(paymentRecord.getSessionId());
                 
                 // Sync all fields from payment record to discount record
                 syncDiscountFields(paymentRecord, discount);
                 
                 // Save the discount record
-                NursingDiscounts savedDiscount = discountsRepository.save(discount);
-                log.info("✅ Created new NursingDiscounts ID: {} synced with PaymentRecord ID: {}", 
+                PolymersDiscounts savedDiscount = discountsRepository.save(discount);
+                log.info("✅ Created new PolymersDiscounts ID: {} synced with PaymentRecord ID: {}", 
                          savedDiscount.getId(), paymentRecord.getId());
                 
                 // Run sync again to ensure consistency
-                String secondSyncResult = paymentRecordRepository.syncNursingBySessionId(paymentRecord.getSessionId());
+                String secondSyncResult = paymentRecordRepository.syncPolymersBySessionId(paymentRecord.getSessionId());
                 log.info("✅ Second sync result: {}", secondSyncResult);
             }
             
@@ -146,15 +146,15 @@ public class NursingStripeService {
             // Fallback to manual sync on error
             try {
                 log.info("🔄 Falling back to manual sync for session: {}", paymentRecord.getSessionId());
-                NursingDiscounts discount = discountsRepository.findBySessionId(paymentRecord.getSessionId());
+                PolymersDiscounts discount = discountsRepository.findBySessionId(paymentRecord.getSessionId());
                 boolean isNewDiscount = (discount == null);
                 
                 if (isNewDiscount) {
-                    log.info("📝 Creating new NursingDiscounts record for session: {}", paymentRecord.getSessionId());
-                    discount = new NursingDiscounts();
+                    log.info("📝 Creating new PolymersDiscounts record for session: {}", paymentRecord.getSessionId());
+                    discount = new PolymersDiscounts();
                     discount.setSessionId(paymentRecord.getSessionId());
                 } else {
-                    log.info("📝 Updating existing NursingDiscounts ID: {} for session: {}", 
+                    log.info("📝 Updating existing PolymersDiscounts ID: {} for session: {}", 
                              discount.getId() != null ? discount.getId() : "null", paymentRecord.getSessionId());
                 }
                 
@@ -162,13 +162,13 @@ public class NursingStripeService {
                 syncDiscountFields(paymentRecord, discount);
                 
                 // Save the discount record
-                NursingDiscounts savedDiscount = discountsRepository.save(discount);
+                PolymersDiscounts savedDiscount = discountsRepository.save(discount);
                 
                 if (isNewDiscount) {
-                    log.info("✅ Created new NursingDiscounts ID: {} synced with PaymentRecord ID: {}", 
+                    log.info("✅ Created new PolymersDiscounts ID: {} synced with PaymentRecord ID: {}", 
                              savedDiscount.getId(), paymentRecord.getId());
                 } else {
-                    log.info("✅ Updated NursingDiscounts ID: {} synced with PaymentRecord ID: {}", 
+                    log.info("✅ Updated PolymersDiscounts ID: {} synced with PaymentRecord ID: {}", 
                              savedDiscount.getId(), paymentRecord.getId());
                 }
                 
@@ -182,7 +182,7 @@ public class NursingStripeService {
     /**
      * Sync fields from payment record to discount record
      */
-    private void syncDiscountFields(NursingPaymentRecord source, NursingDiscounts target) {
+    private void syncDiscountFields(PolymersPaymentRecord source, PolymersDiscounts target) {
         // Core payment fields
         target.setCustomerEmail(source.getCustomerEmail());
         target.setAmountTotal(source.getAmountTotal());
@@ -202,8 +202,8 @@ public class NursingStripeService {
                   target.getCurrency(), target.getStatus());
     }
 
-    public NursingPaymentResponseDTO mapSessionToResponceDTO(Session session) {
-        NursingPaymentResponseDTO responseDTO = new NursingPaymentResponseDTO();
+    public PolymersPaymentResponseDTO mapSessionToResponseDTO(Session session) {
+        PolymersPaymentResponseDTO responseDTO = new PolymersPaymentResponseDTO();
         responseDTO.setSessionId(session.getId());
         responseDTO.setUrl(session.getUrl()); // Add the checkout URL
         
@@ -223,7 +223,7 @@ public class NursingStripeService {
             responseDTO.setCustomerName(session.getMetadata().get("customerName"));
             responseDTO.setProductName(session.getMetadata().get("productName"));
         }
-        
+
         log.info("✅ Mapped session to response DTO with paymentStatus: {}", responseDTO.getPaymentStatus());
         
         return responseDTO;
@@ -232,8 +232,8 @@ public class NursingStripeService {
     /**
      * Create complete response DTO with both Stripe session and database record information
      */
-    public NursingPaymentResponseDTO createCompleteResponseDTO(Session session, NursingPaymentRecord paymentRecord) {
-        NursingPaymentResponseDTO responseDTO = new NursingPaymentResponseDTO();
+    public PolymersPaymentResponseDTO createCompleteResponseDTO(Session session, PolymersPaymentRecord paymentRecord) {
+        PolymersPaymentResponseDTO responseDTO = new PolymersPaymentResponseDTO();
 
         // Map Stripe session information
         responseDTO.setSessionId(session.getId());
@@ -242,32 +242,32 @@ public class NursingStripeService {
         responseDTO.setPaymentStatus(paymentRecord.getPaymentStatus());
         responseDTO.setStripeCreatedAt(convertToLocalDateTime(session.getCreated()));
         responseDTO.setStripeExpiresAt(convertToLocalDateTime(session.getExpiresAt()));
-        
+
         // Map database record information
         responseDTO.setId(paymentRecord.getId());
         responseDTO.setCustomerEmail(paymentRecord.getCustomerEmail());
         responseDTO.setAmountTotalEuros(paymentRecord.getAmountTotal());
         responseDTO.setAmountTotalCents(paymentRecord.getAmountTotal().multiply(BigDecimal.valueOf(100)).longValue());
         responseDTO.setCurrency(paymentRecord.getCurrency());
-        responseDTO.setStatus(paymentRecord.getStatus());
+        responseDTO.setStatus(paymentRecord.getStatus() != null ? paymentRecord.getStatus().toString() : null);
         responseDTO.setCreatedAt(paymentRecord.getCreatedAt());
         responseDTO.setUpdatedAt(paymentRecord.getUpdatedAt());
-        
+
         // Map pricing config information if available
         if (paymentRecord.getPricingConfig() != null) {
             responseDTO.setPricingConfigId(paymentRecord.getPricingConfig().getId());
             responseDTO.setPricingConfigTotalPrice(paymentRecord.getPricingConfig().getTotalPrice());
         }
-        
+
         // Map other fields from session metadata if available
         if (session.getMetadata() != null) {
             responseDTO.setCustomerName(session.getMetadata().get("customerName"));
             responseDTO.setProductName(session.getMetadata().get("productName"));
         }
-        
+
         log.info("✅ Created complete response DTO with DB ID: {} and session ID: {} with paymentStatus: {}", 
                 paymentRecord.getId(), session.getId(), paymentRecord.getPaymentStatus());
-        
+
         return responseDTO;
     }
 
@@ -339,20 +339,20 @@ public class NursingStripeService {
                 convertToLocalDateTime(session.getCreated()));
 
         // 💾 Save to DB with status PENDING - always EUR currency
-        NursingPaymentRecord record = NursingPaymentRecord.builder()
+        PolymersPaymentRecord record = PolymersPaymentRecord.builder()
             .sessionId(session.getId())
             .paymentIntentId(null)
             .customerEmail(request.getEmail())
             .amountTotal(BigDecimal.valueOf(request.getUnitAmount() * request.getQuantity()).divide(BigDecimal.valueOf(100))) // Convert cents to euros
             .currency("eur") // Always EUR
-            .status(NursingPaymentRecord.PaymentStatus.PENDING) // Initial status should be PENDING
+            .status(PolymersPaymentRecord.PaymentStatus.PENDING) // Initial status should be PENDING
             .stripeCreatedAt(convertToLocalDateTime(session.getCreated()))
             .stripeExpiresAt(convertToLocalDateTime(session.getExpiresAt()))
             .paymentStatus(session.getPaymentStatus())
             .build();
 
         paymentRecordRepository.save(record);
-        log.info("💾 Saved NursingPaymentRecord for session: {}", session.getId());
+        log.info("💾 Saved PolymersPaymentRecord for session: {}", session.getId());
 
         // 🔄 Auto-sync discount table when payment record is created
         autoSyncDiscountOnPaymentUpdate(record);
@@ -370,7 +370,7 @@ public class NursingStripeService {
      * Use createCheckoutSessionWithPricingValidation instead.
      */
     @Deprecated
-    public NursingPaymentResponseDTO createCheckoutSessionWithoutPricingValidation(CheckoutRequest request) throws StripeException {
+    public PolymersPaymentResponseDTO createCheckoutSessionWithoutPricingValidation(CheckoutRequest request) throws StripeException {
         throw new UnsupportedOperationException("pricingConfigId is now mandatory. Use createCheckoutSessionWithPricingValidation instead.");
     }
 
@@ -378,7 +378,7 @@ public class NursingStripeService {
      * Create checkout session with pricing config validation
      * This ensures the payment amount matches the configured pricing
      */
-    public Session createCheckoutSessionWithPricing(CheckoutRequest request, NursingPricingConfig pricingConfig) throws StripeException {
+    public Session createCheckoutSessionWithPricing(CheckoutRequest request, PolymersPricingConfig pricingConfig) throws StripeException {
         log.info("Creating checkout session with pricing config validation for product: {}", request.getProductName());
         
         // Validate EUR currency first
@@ -470,7 +470,7 @@ public class NursingStripeService {
                     pricingConfig.getId());
 
             // 💾 Save to DB with pricing config relationship - always EUR currency
-        NursingPaymentRecord record = NursingPaymentRecord.fromStripeWithPricing(
+        PolymersPaymentRecord record = PolymersPaymentRecord.fromStripeWithPricing(
             session.getId(),
             request.getEmail(),
             "eur", // Always EUR
@@ -482,11 +482,11 @@ public class NursingStripeService {
 
 
         paymentRecordRepository.save(record);
-        log.info("💾 Saved NursingPaymentRecord for session: {} with NursingPricingConfig: {}", 
+        log.info("💾 Saved PolymersPaymentRecord for session: {} with PolymersPricingConfig: {}", 
                 session.getId(), pricingConfig.getId());
-        // ToDo: Implement auto-sync for discount table
+
         // 🔄 Auto-sync discount table when payment record is created
-      //  autoSyncDiscountOnPaymentUpdate(record);
+        autoSyncDiscountOnPaymentUpdate(record);
 
         return session;
 
@@ -500,7 +500,7 @@ public class NursingStripeService {
      * Create checkout session with strict validation against pricing config
      * Validates amount, currency, and ensures all values are in euros
      */
-    public NursingPaymentResponseDTO createValidatedCheckoutSession(CheckoutRequest request) throws StripeException {
+    public PolymersPaymentResponseDTO createValidatedCheckoutSession(CheckoutRequest request) throws StripeException {
         log.info("Creating validated checkout session for pricingConfigId: {}", request.getPricingConfigId());
         
         // 1. Validate required fields
@@ -512,10 +512,10 @@ public class NursingStripeService {
         validateEuroCurrency(request);
         
         // 3. Fetch pricing config
-        NursingPricingConfig pricingConfig = pricingConfigRepository.findById(request.getPricingConfigId())
-            .orElseThrow(() -> new IllegalArgumentException("NursingPricingConfig not found with ID: " + request.getPricingConfigId()));
+        PolymersPricingConfig pricingConfig = pricingConfigRepository.findById(request.getPricingConfigId())
+            .orElseThrow(() -> new IllegalArgumentException("PolymersPricingConfig not found with ID: " + request.getPricingConfigId()));
         
-        log.info("Found NursingPricingConfig with total price: {} EUR", pricingConfig.getTotalPrice());
+        log.info("Found PolymersPricingConfig with total price: {} EUR", pricingConfig.getTotalPrice());
         
         // 4. Validate unitAmount matches pricing config (convert euros to cents for comparison)
         Long expectedAmountInCents = pricingConfig.getTotalPrice().multiply(BigDecimal.valueOf(100)).longValue();
@@ -537,13 +537,11 @@ public class NursingStripeService {
         Session session = createCheckoutSessionWithPricing(request, pricingConfig);
         
         // 6. Fetch the saved PaymentRecord from database
-        NursingPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(session.getId())
-            .orElseThrow(() -> new RuntimeException("NursingPaymentRecord not found after creation for session: " + session.getId()));
-        
+        PolymersPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(session.getId())
+            .orElseThrow(() -> new RuntimeException("PolymersPaymentRecord not found after creation for session: " + session.getId()));
         // 7. Create complete response DTO with both Stripe and DB information
-        NursingPaymentResponseDTO response = createCompleteResponseDTO(session, paymentRecord);
-        log.info("✅ Validated checkout session created: {} with Nursing DB ID: {}", session.getId(), paymentRecord.getId());
-        
+        PolymersPaymentResponseDTO response = createCompleteResponseDTO(session, paymentRecord);
+        log.info("✅ Validated checkout session created: {} with Polymers DB ID: {}", session.getId(), paymentRecord.getId());
         return response;
     }
 
@@ -551,48 +549,37 @@ public class NursingStripeService {
      * Create checkout session with pricing config ID validation
      * Fetches pricing config by ID and validates amount matches exactly in EUROS
      */
-    public NursingPaymentResponseDTO createCheckoutSessionWithPricingValidation(CheckoutRequest request, Long pricingConfigId) throws StripeException {
+    public PolymersPaymentResponseDTO createCheckoutSessionWithPricingValidation(CheckoutRequest request, Long pricingConfigId) throws StripeException {
         log.info("Creating checkout session with mandatory pricing config ID: {}", pricingConfigId);
-        
         // 1. Validate currency is EUR
         validateEuroCurrency(request);
-        
         // 2. Fetch pricing config by ID
-        NursingPricingConfig pricingConfig = pricingConfigRepository.findById(pricingConfigId)
-            .orElseThrow(() -> new IllegalArgumentException("NursingPricingConfig not found with ID: " + pricingConfigId));
-        
-        log.info("Found NursingPricingConfig with total price: {} EUR", pricingConfig.getTotalPrice());
-        
+        PolymersPricingConfig pricingConfig = pricingConfigRepository.findById(pricingConfigId)
+            .orElseThrow(() -> new IllegalArgumentException("PolymersPricingConfig not found with ID: " + pricingConfigId));
+        log.info("Found PolymersPricingConfig with total price: {} EUR", pricingConfig.getTotalPrice());
         // 3. Convert request amount back to euros for comparison (request comes in cents after controller conversion)
         BigDecimal requestTotalInEuros = BigDecimal.valueOf(request.getUnitAmount() * request.getQuantity()).divide(BigDecimal.valueOf(100));
         BigDecimal pricingConfigTotalInEuros = pricingConfig.getTotalPrice();
-        
         log.info("Comparing amounts in EUROS - Request total: {} EUR, PricingConfig total: {} EUR", 
                 requestTotalInEuros, pricingConfigTotalInEuros);
-        
         // 4. Validate amounts match exactly in EUROS (with scale precision)
         if (requestTotalInEuros.compareTo(pricingConfigTotalInEuros) != 0) {
-            log.error("❌ Nursing payment amount validation failed in EUROS. Expected: {} EUR, Requested: {} EUR", 
+            log.error("❌ Polymers payment amount validation failed in EUROS. Expected: {} EUR, Requested: {} EUR", 
                      pricingConfigTotalInEuros, requestTotalInEuros);
             throw new IllegalArgumentException(
-                String.format("Nursing payment amount mismatch. Expected: %s EUR from NursingPricingConfig, but received: %s EUR in request", 
+                String.format("Polymers payment amount mismatch. Expected: %s EUR from PolymersPricingConfig, but received: %s EUR in request", 
                             pricingConfigTotalInEuros, requestTotalInEuros));
         }
-        
-        log.info("✅ Amount validation passed in EUROS: {} EUR matches NursingPricingConfig", requestTotalInEuros);
-        
+        log.info("✅ Amount validation passed in EUROS: {} EUR matches PolymersPricingConfig", requestTotalInEuros);
         // 5. Create Stripe session using the existing method
         Session session = createCheckoutSessionWithPricing(request, pricingConfig);
-        
-        // 6. Fetch the saved NursingPaymentRecord from database
-        NursingPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(session.getId())
-            .orElseThrow(() -> new RuntimeException("NursingPaymentRecord not found after creation for session: " + session.getId()));
-        
+        // 6. Fetch the saved PolymersPaymentRecord from database
+        PolymersPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(session.getId())
+            .orElseThrow(() -> new RuntimeException("PolymersPaymentRecord not found after creation for session: " + session.getId()));
         // 7. Create complete response DTO with both Stripe and DB information
-        NursingPaymentResponseDTO response = createCompleteResponseDTO(session, paymentRecord);
-        log.info("✅ Nursing checkout session created with mandatory pricing validation: {} with Nursing DB ID: {}", 
+        PolymersPaymentResponseDTO response = createCompleteResponseDTO(session, paymentRecord);
+        log.info("✅ Polymers checkout session created with mandatory pricing validation: {} with Polymers DB ID: {}", 
                 session.getId(), paymentRecord.getId());
-        
         return response;
     }
 
@@ -912,15 +899,15 @@ public class NursingStripeService {
         try {
             log.info("🔄 Processing manually extracted session data for session: {}", sessionId);
             
-            // Find existing NursingPaymentRecord
-            NursingPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(sessionId)
+            // Find existing PolymersPaymentRecord
+            PolymersPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(sessionId)
                 .orElse(null);
             
             if (paymentRecord != null) {
-                log.info("📋 Found existing NursingPaymentRecord ID: {} for session: {}", paymentRecord.getId(), sessionId);
+                log.info("📋 Found existing PolymersPaymentRecord ID: {} for session: {}", paymentRecord.getId(), sessionId);
                 // Update existing record with webhook data
                 paymentRecord.setPaymentIntentId(paymentIntent);
-                paymentRecord.setStatus(NursingPaymentRecord.PaymentStatus.COMPLETED);
+                paymentRecord.setStatus(PolymersPaymentRecord.PaymentStatus.COMPLETED);
                 paymentRecord.setPaymentStatus(paymentStatus != null ? paymentStatus : "paid");
                 // Update customer email if it was null before
                 if (paymentRecord.getCustomerEmail() == null && customerEmail != null) {
@@ -939,33 +926,33 @@ public class NursingStripeService {
                 if (currency != null && paymentRecord.getCurrency() == null) {
                     paymentRecord.setCurrency(currency);
                 }
-                NursingPaymentRecord savedRecord = paymentRecordRepository.save(paymentRecord);
-                log.info("💾 ✅ Updated NursingPaymentRecord ID: {} for session: {} to COMPLETED status with paymentStatus '{}'", 
+                PolymersPaymentRecord savedRecord = paymentRecordRepository.save(paymentRecord);
+                log.info("💾 ✅ Updated PolymersPaymentRecord ID: {} for session: {} to COMPLETED status with paymentStatus '{}'", 
                         savedRecord.getId(), sessionId, savedRecord.getPaymentStatus());
                 
                 // 🔄 Auto-sync discount table when payment record is updated
                 autoSyncDiscountOnPaymentUpdate(savedRecord);
                 
                 // Log the current state for debugging
-                log.info("🔍 NursingPaymentRecord state after manual update: ID={}, Status={}, PaymentStatus={}, PaymentIntentId={}", 
+                log.info("🔍 PolymersPaymentRecord state after manual update: ID={}, Status={}, PaymentStatus={}, PaymentIntentId={}", 
                         savedRecord.getId(), savedRecord.getStatus(), savedRecord.getPaymentStatus(), savedRecord.getPaymentIntentId());
                 // Link registration after successful payment (pass null for session since we don't have the object)
                 autoRegisterUserAfterPaymentManual(savedRecord, customerEmail);
             } else {
-                log.warn("⚠️ NursingPaymentRecord not found for session {}, creating new one from webhook data", sessionId);
-                NursingPaymentRecord newRecord = NursingPaymentRecord.builder()
+                log.warn("⚠️ PolymersPaymentRecord not found for session {}, creating new one from webhook data", sessionId);
+                PolymersPaymentRecord newRecord = PolymersPaymentRecord.builder()
                         .sessionId(sessionId)
                         .paymentIntentId(paymentIntent)
                         .customerEmail(customerEmail)
                         .amountTotal(amountTotal != null ? 
                             BigDecimal.valueOf(amountTotal).divide(BigDecimal.valueOf(100)) : null)
                         .currency(currency != null ? currency : "eur")
-                        .status(NursingPaymentRecord.PaymentStatus.COMPLETED)
+                        .status(PolymersPaymentRecord.PaymentStatus.COMPLETED)
                         .stripeCreatedAt(LocalDateTime.now()) // Use current time since we don't have stripe timestamp
                         .paymentStatus(paymentStatus != null ? paymentStatus : "paid")
                         .build();
-                NursingPaymentRecord savedRecord = paymentRecordRepository.save(newRecord);
-                log.info("💾 ✅ Created new NursingPaymentRecord ID: {} for session: {} with paymentStatus '{}'", 
+                PolymersPaymentRecord savedRecord = paymentRecordRepository.save(newRecord);
+                log.info("💾 ✅ Created new PolymersPaymentRecord ID: {} for session: {} with paymentStatus '{}'", 
                         savedRecord.getId(), sessionId, savedRecord.getPaymentStatus());
                 // Link registration after successful payment
                 autoRegisterUserAfterPaymentManual(savedRecord, customerEmail);
@@ -978,8 +965,8 @@ public class NursingStripeService {
     /**
      * Auto-register user after payment using manual data extraction
      */
-    private void autoRegisterUserAfterPaymentManual(NursingPaymentRecord paymentRecord, String customerEmail) {
-        log.info("🔄 Manual verification of association for nursing payment record ID: {}", paymentRecord.getId());
+    private void autoRegisterUserAfterPaymentManual(PolymersPaymentRecord paymentRecord, String customerEmail) {
+        log.info("🔄 Manual verification of association for polymers payment record ID: {}", paymentRecord.getId());
         try {
             // Use the existing auto-registration logic but with manual email extraction
             if (customerEmail == null) {
@@ -989,21 +976,21 @@ public class NursingStripeService {
                 log.error("❌ CRITICAL: Cannot verify association - customer email not found for nursing payment record ID: {}", paymentRecord.getId());
                 return;
             }
-            // Find the most recent nursing registration form for this customer email
+            // Find the most recent polymers registration form for this customer email
             var existingRegistration = registrationFormRepository.findTopByEmailOrderByIdDesc(customerEmail);
             if (existingRegistration == null) {
-                log.error("❌ CRITICAL: No nursing registration form found for email: {} (nursing payment record ID: {})", 
+                log.error("❌ CRITICAL: No polymers registration form found for email: {} (polymers payment record ID: {})", 
                         customerEmail, paymentRecord.getId());
                 return;
             }
             // Check if association already exists
             if (paymentRecord.getRegistrationForm() != null) {
-                log.info("✅ Nursing payment record ID: {} already has registration form ID: {} associated", 
+                log.info("✅ Polymers payment record ID: {} already has registration form ID: {} associated", 
                         paymentRecord.getId(), paymentRecord.getRegistrationForm().getId());
                 return;
             }
             // Establish the bidirectional association
-            log.info("🔗 Creating association between nursing registration form ID: {} and nursing payment record ID: {}", 
+            log.info("🔗 Creating association between polymers registration form ID: {} and polymers payment record ID: {}", 
                     existingRegistration.getId(), paymentRecord.getId());
             existingRegistration.setPaymentRecord(paymentRecord);
             paymentRecord.setRegistrationForm(existingRegistration);
@@ -1014,10 +1001,10 @@ public class NursingStripeService {
             // 🔄 Auto-sync discount table when payment record is updated
             autoSyncDiscountOnPaymentUpdate(paymentRecord);
             
-            log.info("✅ Successfully linked nursing registration form ID: {} to nursing payment record ID: {}", 
+            log.info("✅ Successfully linked polymers registration form ID: {} to polymers payment record ID: {}", 
                     existingRegistration.getId(), paymentRecord.getId());
         } catch (Exception e) {
-            log.error("❌ Error in manual registration linking for nursing payment record ID {}: {}", 
+            log.error("❌ Error in manual registration linking for polymers payment record ID {}: {}", 
                     paymentRecord.getId(), e.getMessage(), e);
         }
     }
@@ -1039,15 +1026,15 @@ public class NursingStripeService {
 
         // Update existing record based on webhook data structure
         try {
-            NursingPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(session.getId())
+            PolymersPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(session.getId())
                 .orElse(null);
             
             if (paymentRecord != null) {
-                log.info("📋 Found existing NursingPaymentRecord ID: {} for session: {}", paymentRecord.getId(), session.getId());
+                log.info("📋 Found existing PolymersPaymentRecord ID: {} for session: {}", paymentRecord.getId(), session.getId());
                 // Update record with webhook data - following the sample structure you provided
                 paymentRecord.setPaymentIntentId(session.getPaymentIntent());
                 if ("complete".equals(session.getStatus())) {
-                    paymentRecord.setStatus(NursingPaymentRecord.PaymentStatus.COMPLETED);
+                    paymentRecord.setStatus(PolymersPaymentRecord.PaymentStatus.COMPLETED);
                 }
                 String stripePaymentStatus = session.getPaymentStatus();
                 paymentRecord.setPaymentStatus(stripePaymentStatus != null ? stripePaymentStatus : "paid");
@@ -1068,36 +1055,36 @@ public class NursingStripeService {
                 if (session.getCurrency() != null && paymentRecord.getCurrency() == null) {
                     paymentRecord.setCurrency(session.getCurrency());
                 }
-                NursingPaymentRecord savedRecord = paymentRecordRepository.save(paymentRecord);
-                log.info("💾 ✅ Updated NursingPaymentRecord ID: {} for session: {} to COMPLETED status with paymentStatus '{}'", 
+                PolymersPaymentRecord savedRecord = paymentRecordRepository.save(paymentRecord);
+                log.info("💾 ✅ Updated PolymersPaymentRecord ID: {} for session: {} to COMPLETED status with paymentStatus '{}'", 
                         savedRecord.getId(), session.getId(), savedRecord.getPaymentStatus());
                 
                 // 🔄 Auto-sync discount table when payment record is updated
                 autoSyncDiscountOnPaymentUpdate(savedRecord);
                 
-                log.info("🔍 NursingPaymentRecord final state: ID={}, Status={}, PaymentStatus={}, PaymentIntentId={}, Amount={} EUR", 
+                log.info("🔍 PolymersPaymentRecord final state: ID={}, Status={}, PaymentStatus={}, PaymentIntentId={}, Amount={} EUR", 
                         savedRecord.getId(), savedRecord.getStatus(), savedRecord.getPaymentStatus(), 
                         savedRecord.getPaymentIntentId(), savedRecord.getAmountTotal());
                 autoRegisterUserAfterPayment(savedRecord, session);
             } else {
-                log.warn("⚠️ NursingPaymentRecord not found for session {}, creating new one based on webhook data", session.getId());
+                log.warn("⚠️ PolymersPaymentRecord not found for session {}, creating new one based on webhook data", session.getId());
                 String customerEmail = session.getCustomerDetails() != null ? 
                     session.getCustomerDetails().getEmail() : session.getCustomerEmail();
                 String stripePaymentStatus = session.getPaymentStatus();
-                NursingPaymentRecord record = NursingPaymentRecord.builder()
+                PolymersPaymentRecord record = PolymersPaymentRecord.builder()
                         .sessionId(session.getId())
                         .paymentIntentId(session.getPaymentIntent())
                         .customerEmail(customerEmail)
                         .amountTotal(session.getAmountTotal() != null ? 
                             BigDecimal.valueOf(session.getAmountTotal()).divide(BigDecimal.valueOf(100)) : null)
                         .currency(session.getCurrency())
-                        .status(NursingPaymentRecord.PaymentStatus.COMPLETED)
+                        .status(PolymersPaymentRecord.PaymentStatus.COMPLETED)
                         .stripeCreatedAt(completedTime)
                         .stripeExpiresAt(convertToLocalDateTime(session.getExpiresAt()))
                         .paymentStatus(stripePaymentStatus != null ? stripePaymentStatus : "paid")
                         .build();
-                NursingPaymentRecord savedRecord = paymentRecordRepository.save(record);
-                log.info("💾 ✅ Created new NursingPaymentRecord ID: {} for session: {} with paymentStatus '{}'", 
+                PolymersPaymentRecord savedRecord = paymentRecordRepository.save(record);
+                log.info("💾 ✅ Created new PolymersPaymentRecord ID: {} for session: {} with paymentStatus '{}'", 
                         savedRecord.getId(), session.getId(), savedRecord.getPaymentStatus());
                 autoRegisterUserAfterPayment(savedRecord, session);
             }
@@ -1145,26 +1132,26 @@ public class NursingStripeService {
      */
     private void processPaymentIntentUpdate(com.stripe.model.PaymentIntent paymentIntent) {
         try {
-            // First, try to find NursingPaymentRecord by payment intent ID
-            NursingPaymentRecord existingRecord = paymentRecordRepository.findByPaymentIntentId(paymentIntent.getId())
+            // First, try to find PolymersPaymentRecord by payment intent ID
+            PolymersPaymentRecord existingRecord = paymentRecordRepository.findByPaymentIntentId(paymentIntent.getId())
                 .orElse(null);
             
             if (existingRecord != null) {
-                log.info("📋 Found existing NursingPaymentRecord by payment intent ID: {}", existingRecord.getId());
+                log.info("📋 Found existing PolymersPaymentRecord by payment intent ID: {}", existingRecord.getId());
                 updateExistingPaymentRecord(existingRecord, paymentIntent);
             } else {
-                log.info("🔍 No NursingPaymentRecord found by payment intent ID, searching for PENDING records...");
+                log.info("🔍 No PolymersPaymentRecord found by payment intent ID, searching for PENDING records...");
                 
                 // Look for PENDING records and update the most suitable one
-                List<NursingPaymentRecord> pendingRecords = paymentRecordRepository.findByStatus(NursingPaymentRecord.PaymentStatus.PENDING);
-                log.info("📊 Found {} PENDING NursingPaymentRecord(s)", pendingRecords.size());
+                List<PolymersPaymentRecord> pendingRecords = paymentRecordRepository.findByStatus(PolymersPaymentRecord.PaymentStatus.PENDING);
+                log.info("📊 Found {} PENDING PolymersPaymentRecord(s)", pendingRecords.size());
                 
                 if (!pendingRecords.isEmpty()) {
                     // Find the best matching pending record (by amount if possible)
-                    NursingPaymentRecord recordToUpdate = findBestMatchingPendingRecord(pendingRecords, paymentIntent);
+                    PolymersPaymentRecord recordToUpdate = findBestMatchingPendingRecord(pendingRecords, paymentIntent);
                     updatePendingPaymentRecord(recordToUpdate, paymentIntent);
                 } else {
-                    log.warn("⚠️ No PENDING NursingPaymentRecord found, creating new record");
+                    log.warn("⚠️ No PENDING PolymersPaymentRecord found, creating new record");
                     createNewPaymentRecord(paymentIntent);
                 }
             }
@@ -1176,10 +1163,10 @@ public class NursingStripeService {
     /**
      * Update existing PaymentRecord that already has payment intent ID
      */
-    private void updateExistingPaymentRecord(NursingPaymentRecord record, com.stripe.model.PaymentIntent paymentIntent) {
-        log.info("🔄 Updating existing NursingPaymentRecord ID: {} for payment intent: {}", record.getId(), paymentIntent.getId());
+    private void updateExistingPaymentRecord(PolymersPaymentRecord record, com.stripe.model.PaymentIntent paymentIntent) {
+        log.info("🔄 Updating existing PolymersPaymentRecord ID: {} for payment intent: {}", record.getId(), paymentIntent.getId());
         
-        record.setStatus(NursingPaymentRecord.PaymentStatus.COMPLETED);
+        record.setStatus(PolymersPaymentRecord.PaymentStatus.COMPLETED);
         record.setPaymentIntentId(paymentIntent.getId());
         record.setPaymentStatus("paid"); // Set Stripe payment status to "paid"
         
@@ -1195,18 +1182,18 @@ public class NursingStripeService {
         }
         
         paymentRecordRepository.save(record);
-        log.info("💾 ✅ Successfully updated existing NursingPaymentRecord ID: {} to COMPLETED status with paymentStatus 'paid'", record.getId());
+        log.info("💾 ✅ Successfully updated existing PolymersPaymentRecord ID: {} to COMPLETED status with paymentStatus 'paid'", record.getId());
     }
     
     /**
      * Find the best matching pending record for the payment intent
      */
-    private NursingPaymentRecord findBestMatchingPendingRecord(List<NursingPaymentRecord> pendingRecords, com.stripe.model.PaymentIntent paymentIntent) {
+    private PolymersPaymentRecord findBestMatchingPendingRecord(List<PolymersPaymentRecord> pendingRecords, com.stripe.model.PaymentIntent paymentIntent) {
         if (paymentIntent.getAmount() != null) {
             BigDecimal paymentAmount = BigDecimal.valueOf(paymentIntent.getAmount()).divide(BigDecimal.valueOf(100));
             
             // Try to find a record with matching amount
-            for (NursingPaymentRecord record : pendingRecords) {
+            for (PolymersPaymentRecord record : pendingRecords) {
                 if (record.getAmountTotal() != null && record.getAmountTotal().compareTo(paymentAmount) == 0) {
                     log.info("🎯 Found PENDING record with matching amount: {} EUR (ID: {})", paymentAmount, record.getId());
                     return record;
@@ -1215,7 +1202,7 @@ public class NursingStripeService {
         }
         
         // If no amount match, return the first (most recent) pending record
-        NursingPaymentRecord firstRecord = pendingRecords.get(0);
+        PolymersPaymentRecord firstRecord = pendingRecords.get(0);
         log.info("📋 Using first PENDING record (ID: {}) - no amount match found", firstRecord.getId());
         return firstRecord;
     }
@@ -1223,11 +1210,11 @@ public class NursingStripeService {
     /**
      * Update a pending PaymentRecord with payment intent information
      */
-    private void updatePendingPaymentRecord(NursingPaymentRecord record, com.stripe.model.PaymentIntent paymentIntent) {
-        log.info("🔄 Updating PENDING NursingPaymentRecord ID: {} with payment intent: {}", record.getId(), paymentIntent.getId());
+    private void updatePendingPaymentRecord(PolymersPaymentRecord record, com.stripe.model.PaymentIntent paymentIntent) {
+        log.info("🔄 Updating PENDING PolymersPaymentRecord ID: {} with payment intent: {}", record.getId(), paymentIntent.getId());
         
         record.setPaymentIntentId(paymentIntent.getId());
-        record.setStatus(NursingPaymentRecord.PaymentStatus.COMPLETED);
+        record.setStatus(PolymersPaymentRecord.PaymentStatus.COMPLETED);
         record.setPaymentStatus("paid"); // Set Stripe payment status to "paid"
         
         // Update amount if needed or if it doesn't match
@@ -1245,27 +1232,27 @@ public class NursingStripeService {
         }
         
         paymentRecordRepository.save(record);
-        log.info("💾 ✅ Successfully updated PENDING NursingPaymentRecord ID: {} to COMPLETED status with paymentStatus 'paid'", record.getId());
+        log.info("💾 ✅ Successfully updated PENDING PolymersPaymentRecord ID: {} to COMPLETED status with paymentStatus 'paid'", record.getId());
     }
     
     /**
      * Create new PaymentRecord from payment intent (fallback)
      */
     private void createNewPaymentRecord(com.stripe.model.PaymentIntent paymentIntent) {
-        log.info("🆕 Creating new NursingPaymentRecord for payment intent: {}", paymentIntent.getId());
+        log.info("🆕 Creating new PolymersPaymentRecord for payment intent: {}", paymentIntent.getId());
         
-        NursingPaymentRecord newRecord = NursingPaymentRecord.builder()
+        PolymersPaymentRecord newRecord = PolymersPaymentRecord.builder()
                 .paymentIntentId(paymentIntent.getId())
                 .amountTotal(paymentIntent.getAmount() != null ? 
                     BigDecimal.valueOf(paymentIntent.getAmount()).divide(BigDecimal.valueOf(100)) : null)
                 .currency(paymentIntent.getCurrency() != null ? paymentIntent.getCurrency() : "eur")
-                .status(NursingPaymentRecord.PaymentStatus.COMPLETED)
+                .status(PolymersPaymentRecord.PaymentStatus.COMPLETED)
                 .paymentStatus("paid") // Set Stripe payment status to "paid"
                 .stripeCreatedAt(convertToLocalDateTime(paymentIntent.getCreated()))
                 .build();
         
         paymentRecordRepository.save(newRecord);
-        log.info("💾 ✅ Created new NursingPaymentRecord ID: {} for payment intent: {} with paymentStatus 'paid'", newRecord.getId(), paymentIntent.getId());
+        log.info("💾 ✅ Created new PolymersPaymentRecord ID: {} for payment intent: {} with paymentStatus 'paid'", newRecord.getId(), paymentIntent.getId());
     }
 
     /**
@@ -1281,17 +1268,17 @@ public class NursingStripeService {
                         paymentIntent.getId(), 
                         paymentIntent.getLastPaymentError() != null ? paymentIntent.getLastPaymentError().getMessage() : "Unknown");
                 
-                // Update NursingPaymentRecord to FAILED status
-                NursingPaymentRecord existingRecord = paymentRecordRepository.findByPaymentIntentId(paymentIntent.getId())
+                // Update PolymersPaymentRecord to FAILED status
+                PolymersPaymentRecord existingRecord = paymentRecordRepository.findByPaymentIntentId(paymentIntent.getId())
                     .orElse(null);
                 
                 if (existingRecord != null) {
-                    existingRecord.setStatus(NursingPaymentRecord.PaymentStatus.FAILED);
+                    existingRecord.setStatus(PolymersPaymentRecord.PaymentStatus.FAILED);
                     existingRecord.setPaymentStatus("failed"); // Set Stripe payment status to "failed"
                     paymentRecordRepository.save(existingRecord);
-                    log.info("💾 Updated NursingPaymentRecord for payment intent: {} to FAILED status with paymentStatus 'failed'", paymentIntent.getId());
+                    log.info("💾 Updated PolymersPaymentRecord for payment intent: {} to FAILED status with paymentStatus 'failed'", paymentIntent.getId());
                 } else {
-                    log.warn("⚠️ NursingPaymentRecord not found for failed payment intent: {}", paymentIntent.getId());
+                    log.warn("⚠️ PolymersPaymentRecord not found for failed payment intent: {}", paymentIntent.getId());
                 }
                 
             } catch (Exception e) {
@@ -1311,17 +1298,17 @@ public class NursingStripeService {
                 
                 log.warn("⏰ Checkout session expired: {}", session.getId());
                 
-                // Update NursingPaymentRecord to EXPIRED status
-                NursingPaymentRecord existingRecord = paymentRecordRepository.findBySessionId(session.getId())
+                // Update PolymersPaymentRecord to EXPIRED status
+                PolymersPaymentRecord existingRecord = paymentRecordRepository.findBySessionId(session.getId())
                     .orElse(null);
                 
                 if (existingRecord != null) {
-                    existingRecord.setStatus(NursingPaymentRecord.PaymentStatus.EXPIRED);
+                    existingRecord.setStatus(PolymersPaymentRecord.PaymentStatus.EXPIRED);
                     existingRecord.setPaymentStatus("expired"); // Set Stripe payment status to "expired"
                     paymentRecordRepository.save(existingRecord);
-                    log.info("💾 Updated NursingPaymentRecord for session: {} to EXPIRED status with paymentStatus 'expired'", session.getId());
+                    log.info("💾 Updated PolymersPaymentRecord for session: {} to EXPIRED status with paymentStatus 'expired'", session.getId());
                 } else {
-                    log.warn("⚠️ NursingPaymentRecord not found for expired session: {}", session.getId());
+                    log.warn("⚠️ PolymersPaymentRecord not found for expired session: {}", session.getId());
                 }
                 
             } catch (Exception e) {
@@ -1330,27 +1317,27 @@ public class NursingStripeService {
         }
     }
 
-public NursingPaymentResponseDTO retrieveSession(String sessionId) throws StripeException {
+public PolymersPaymentResponseDTO retrieveSession(String sessionId) throws StripeException {
         log.info("Retrieving session with ID: {}", sessionId);
         Stripe.apiKey = secretKey;
         
         try {
             Session session = Session.retrieve(sessionId);
-            return mapSessionToResponceDTO(session);
+            return mapSessionToResponseDTO(session);
         } catch (StripeException e) {
             log.error("Error retrieving session: {}", e.getMessage());
             throw e;
         }
     }
 
-    public NursingPaymentResponseDTO expireSession(String sessionId) throws StripeException {
+    public PolymersPaymentResponseDTO expireSession(String sessionId) throws StripeException {
         log.info("Expiring session with ID: {}", sessionId);
         Stripe.apiKey = secretKey;
         
         try {
             Session session = Session.retrieve(sessionId);
             Session expiredSession = session.expire();
-            return mapSessionToResponceDTO(expiredSession);
+            return mapSessionToResponseDTO(expiredSession);
         } catch (StripeException e) {
             log.error("Error expiring session: {}", e.getMessage());
             throw e;
@@ -1384,7 +1371,7 @@ public NursingPaymentResponseDTO retrieveSession(String sessionId) throws Stripe
      * after successful payment. This replaces the auto-registration logic since the form
      * is now created upfront with all user data.
      */
-    private void autoRegisterUserAfterPayment(NursingPaymentRecord paymentRecord, Session session) {
+    private void autoRegisterUserAfterPayment(PolymersPaymentRecord paymentRecord, Session session) {
         log.info("🔄 Verifying association between registration form and payment record ID: {}", paymentRecord.getId());
         
         try {
@@ -1407,7 +1394,7 @@ public NursingPaymentResponseDTO retrieveSession(String sessionId) throws Stripe
             }
             
             // Find the most recent registration form for this customer email
-            NursingRegistrationForm existingRegistration = registrationFormRepository.findTopByEmailOrderByIdDesc(customerEmail);
+            PolymersRegistrationForm existingRegistration = registrationFormRepository.findTopByEmailOrderByIdDesc(customerEmail);
             
             if (existingRegistration == null) {
                 log.error("❌ CRITICAL: No registration form found for email: {} (payment record ID: {})", 
@@ -1462,11 +1449,11 @@ public NursingPaymentResponseDTO retrieveSession(String sessionId) throws Stripe
         
         try {
             // Find the registration form
-            NursingRegistrationForm registrationForm = registrationFormRepository.findById(registrationFormId)
+            PolymersRegistrationForm registrationForm = registrationFormRepository.findById(registrationFormId)
                     .orElseThrow(() -> new IllegalArgumentException("RegistrationForm not found with ID: " + registrationFormId));
             
             // Find the payment record
-            NursingPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(sessionId)
+            PolymersPaymentRecord paymentRecord = paymentRecordRepository.findBySessionId(sessionId)
                     .orElseThrow(() -> new IllegalArgumentException("PaymentRecord not found for session: " + sessionId));
             
             // Establish the bidirectional relationship

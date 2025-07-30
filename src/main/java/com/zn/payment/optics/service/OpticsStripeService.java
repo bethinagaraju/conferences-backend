@@ -355,7 +355,7 @@ public class OpticsStripeService {
         log.info("💾 Saved PaymentRecord for session: {}", session.getId());
 
         // 🔄 Auto-sync discount table when payment record is created
-        autoSyncDiscountOnPaymentUpdate(record);
+       // autoSyncDiscountOnPaymentUpdate(record);
 
         return session;
 
@@ -368,7 +368,7 @@ public class OpticsStripeService {
     /**
      * @deprecated This method is no longer used since pricingConfigId is now mandatory.
      * Use createCheckoutSessionWithPricingValidation instead.
-     */
+     */ 
     @Deprecated
     public OpticsPaymentResponseDTO createCheckoutSessionWithoutPricingValidation(CheckoutRequest request) throws StripeException {
         throw new UnsupportedOperationException("pricingConfigId is now mandatory. Use createCheckoutSessionWithPricingValidation instead.");
