@@ -235,9 +235,10 @@ public class PaymentController {
             }
 
             if (event != null) {
-                // 1. Try to extract productName and paymentType from event metadata
+                // 1. Try to extract productName, paymentType, and source from event metadata
                 String productName = null;
                 String paymentType = null;
+                String source = null;
                 try {
                     java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                     if (stripeObjectOpt.isPresent()) {
@@ -251,6 +252,7 @@ public class PaymentController {
                                 if (metadata != null) {
                                     productName = metadata.get("productName");
                                     paymentType = metadata.get("paymentType");
+                                    source = metadata.get("source");
                                 }
                             }
                         } catch (Exception ex) {
@@ -258,37 +260,14 @@ public class PaymentController {
                         }
                     }
                 } catch (Exception ex) {
-                    log.warn("[Webhook Debug] Could not extract productName/paymentType from event: {}", ex.getMessage());
+                    log.warn("[Webhook Debug] Could not extract productName/paymentType/source from event: {}", ex.getMessage());
                 }
 
-                // If paymentType is discount-registration, DO NOT process in this webhook (handled by /api/discounts/webhook)
-                if (paymentType != null && paymentType.equalsIgnoreCase("discount-registration")) {
-                    log.info("[Webhook Debug] Skipping discount-registration paymentType in /api/payment/webhook. Only /api/discounts/webhook should process discount payments.");
+                // If paymentType is discount-registration or source is discount-api, DO NOT process in this webhook (handled by /api/discounts/webhook)
+                if ((paymentType != null && paymentType.equalsIgnoreCase("discount-registration")) ||
+                    (source != null && source.equalsIgnoreCase("discount-api"))) {
+                    log.info("[Webhook Debug] Skipping discount payment (paymentType=discount-registration or source=discount-api) in /api/payment/webhook. Only /api/discounts/webhook should process discount payments.");
                     return ResponseEntity.ok("Discount payment ignored in payment webhook");
-                }
-
-                // Defensive: If metadata.source == "discount-api", also skip
-                try {
-                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                    if (stripeObjectOpt.isPresent()) {
-                        com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
-                        java.util.Map<String, String> metadata = null;
-                        try {
-                            java.lang.reflect.Method getMetadata = stripeObject.getClass().getMethod("getMetadata");
-                            Object metaObj = getMetadata.invoke(stripeObject);
-                            if (metaObj instanceof java.util.Map) {
-                                metadata = (java.util.Map<String, String>) metaObj;
-                                if (metadata != null && "discount-api".equalsIgnoreCase(metadata.get("source"))) {
-                                    log.info("[Webhook Debug] Skipping event with source=discount-api in /api/payment/webhook. Only /api/discounts/webhook should process discount payments.");
-                                    return ResponseEntity.ok("Discount payment (source=discount-api) ignored in payment webhook");
-                                }
-                            }
-                        } catch (Exception ex) {
-                            // ignore
-                        }
-                    }
-                } catch (Exception ex) {
-                    // ignore
                 }
 
                 // 2. Try to extract productName for normal routing
