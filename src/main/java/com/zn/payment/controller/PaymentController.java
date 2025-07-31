@@ -267,6 +267,30 @@ public class PaymentController {
                     return ResponseEntity.ok("Discount payment ignored in payment webhook");
                 }
 
+                // Defensive: If metadata.source == "discount-api", also skip
+                try {
+                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                    if (stripeObjectOpt.isPresent()) {
+                        com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
+                        java.util.Map<String, String> metadata = null;
+                        try {
+                            java.lang.reflect.Method getMetadata = stripeObject.getClass().getMethod("getMetadata");
+                            Object metaObj = getMetadata.invoke(stripeObject);
+                            if (metaObj instanceof java.util.Map) {
+                                metadata = (java.util.Map<String, String>) metaObj;
+                                if (metadata != null && "discount-api".equalsIgnoreCase(metadata.get("source"))) {
+                                    log.info("[Webhook Debug] Skipping event with source=discount-api in /api/payment/webhook. Only /api/discounts/webhook should process discount payments.");
+                                    return ResponseEntity.ok("Discount payment (source=discount-api) ignored in payment webhook");
+                                }
+                            }
+                        } catch (Exception ex) {
+                            // ignore
+                        }
+                    }
+                } catch (Exception ex) {
+                    // ignore
+                }
+
                 // 2. Try to extract productName for normal routing
                 if (productName != null && !productName.isEmpty()) {
                     String productNameUpper = productName.toUpperCase();
@@ -301,7 +325,6 @@ public class PaymentController {
                 }
                 if (successUrl != null && !successUrl.isEmpty()) {
                     String urlLower = successUrl.toLowerCase();
-                    // log.info("[Webhook Debug] Found success_url: {}", successUrl); // Removed as requested
                     if (urlLower.contains("globallopmeet.com") || urlLower.contains("optics")) {
                         log.info("[Webhook Debug] Routing to Optics service by success_url/domain match.");
                         opticsStripeService.processWebhookEvent(event);
