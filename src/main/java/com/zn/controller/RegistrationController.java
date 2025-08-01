@@ -11,33 +11,35 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import jakarta.servlet.http.HttpServletRequest;
 
 import com.zn.dto.PriceCalculationRequestDTO;
 import com.zn.dto.PricingConfigResponseDTO;
-
-// Vertical-specific entities and repositories for domain-based routing
-import com.zn.optics.entity.OpticsPricingConfig;
-import com.zn.optics.entity.OpticsPresentationType;
-import com.zn.optics.entity.OpticsRegistrationForm;
-import com.zn.optics.repository.IOpticsPricingConfigRepository;
-import com.zn.optics.repository.IOpricsRegistrationFormRepository;
-import com.zn.optics.repository.IOpticsPresentationTypeRepo;
-
-import com.zn.nursing.entity.NursingPricingConfig;
 import com.zn.nursing.entity.NursingPresentationType;
+import com.zn.nursing.entity.NursingPricingConfig;
 import com.zn.nursing.entity.NursingRegistrationForm;
+import com.zn.nursing.repository.INursingPresentationTypeRepo;
 import com.zn.nursing.repository.INursingPricingConfigRepository;
 import com.zn.nursing.repository.INursingRegistrationFormRepository;
-import com.zn.nursing.repository.INursingPresentationTypeRepo;
-
-import com.zn.renewable.entity.RenewablePricingConfig;
+import com.zn.optics.entity.OpticsPresentationType;
+// Vertical-specific entities and repositories for domain-based routing
+import com.zn.optics.entity.OpticsPricingConfig;
+import com.zn.optics.entity.OpticsRegistrationForm;
+import com.zn.optics.repository.IOpricsRegistrationFormRepository;
+import com.zn.optics.repository.IOpticsPresentationTypeRepo;
+import com.zn.optics.repository.IOpticsPricingConfigRepository;
+import com.zn.polymers.entity.PolymersPricingConfig;
+import com.zn.polymers.entity.PolymersRegistrationForm;
+import com.zn.polymers.repository.IPolymersPresentationTypeRepo;
+import com.zn.polymers.repository.IPolymersPricingConfigRepository;
+import com.zn.polymers.repository.IPolymersRegistrationFormRepository;
 import com.zn.renewable.entity.RenewablePresentationType;
+import com.zn.renewable.entity.RenewablePricingConfig;
 import com.zn.renewable.entity.RenewableRegistrationForm;
+import com.zn.renewable.repository.IRenewablePresentationTypeRepo;
 import com.zn.renewable.repository.IRenewablePricingConfigRepository;
 import com.zn.renewable.repository.IRenewableRegistrationFormRepository;
-import com.zn.renewable.repository.IRenewablePresentationTypeRepo;
 
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 
 @RestController
@@ -59,7 +61,13 @@ public class RegistrationController {
     private INursingRegistrationFormRepository nursingRegistrationFormRepository;
     @Autowired
     private INursingPresentationTypeRepo nursingPresentationTypeRepo;
-    
+    @Autowired
+private IPolymersPricingConfigRepository polymerPricingConfigRepo;
+@Autowired
+private IPolymersPresentationTypeRepo polymerPresentationTypeRepo;
+@Autowired
+private IPolymersRegistrationFormRepository polymerRegistrationFormRepository;
+
     @Autowired
     private IRenewablePricingConfigRepository renewablePricingConfigRepo;
     @Autowired
@@ -364,24 +372,81 @@ public class RegistrationController {
         }
     }
 
-    // --- POLYMERS LOGIC ---
-    private ResponseEntity<?> handlePolymersRequest(PriceCalculationRequestDTO request) {
-        log.info("Handling polymers pricing request - implementation needed");
-        // TODO: Implement actual logic for polymers pricing config lookup
-        return ResponseEntity.status(501).body("Polymers pricing config lookup not implemented yet.");
-    }
 
-    private ResponseEntity<?> handlePolymersRegistration(Object request) {
-        log.info("Handling polymers registration - implementation needed");
-        // TODO: Implement actual logic for polymers registration
-        return ResponseEntity.status(501).body("Polymers registration not implemented yet.");
+private ResponseEntity<?> handlePolymersRequest(PriceCalculationRequestDTO request) {
+    log.info("Handling polymers pricing request");
+    Optional<com.zn.polymers.entity.PolymersPresentationType> ptOpt = polymerPresentationTypeRepo.findByType(request.getPresentationType());
+    if (ptOpt.isEmpty()) {
+        log.warn("Invalid presentation type: {}", request.getPresentationType());
+        return ResponseEntity.badRequest().body("Invalid presentation type: " + request.getPresentationType());
+    }
+    com.zn.polymers.entity.PolymersPresentationType ptEntity = ptOpt.get();
+    List<com.zn.polymers.entity.PolymersPricingConfig> results;
+    switch (request.getRegistrationType()) {
+        case "REGISTRATION_ONLY":
+            log.info("Fetching polymer pricing config with NO accommodation for presentation type: {}", ptEntity.getType());
+            results = polymerPricingConfigRepo.findAllByPresentationTypeAndNoAccommodation(ptEntity);
+            break;
+        case "REGISTRATION_AND_ACCOMMODATION":
+            log.info("Fetching polymer pricing config WITH accommodation: nights={}, guests={}, type={}",
+                    request.getNumberOfNights(), request.getNumberOfGuests(), ptEntity.getType());
+            results = polymerPricingConfigRepo.findAllByPresentationTypeAndAccommodationDetails(
+                    ptEntity, request.getNumberOfNights(), request.getNumberOfGuests());
+            break;
+        default:
+            log.warn("Invalid registration type: {}", request.getRegistrationType());
+            return ResponseEntity.badRequest().body("Invalid registration type.");
+    }
+    if (results.isEmpty()) {
+        log.warn("No polymer pricing configurations found for type={}, registrationType={}, nights={}, guests={}",
+                request.getPresentationType(), request.getRegistrationType(),
+                request.getNumberOfNights(), request.getNumberOfGuests());
+        return ResponseEntity.status(404).body("No pricing configurations found for the provided criteria.");
+    }
+    List<PricingConfigResponseDTO> dtoList = results.stream().map(p -> {
+        PricingConfigResponseDTO dto = new PricingConfigResponseDTO();
+        dto.setId(p.getId());
+        dto.setTotalPrice(p.getTotalPrice());
+        dto.setProcessingFeePercent(p.getProcessingFeePercent());
+        dto.setPresentationType((com.zn.Ientity.IPresentationType) p.getPresentationType());
+        dto.setAccommodationOption((com.zn.Ientity.IAccommodation) p.getAccommodationOption());
+        return dto;
+    }).collect(Collectors.toList());
+    log.info("Returning {} polymer pricing config(s).", dtoList.size());
+    return ResponseEntity.ok(dtoList);
+}
+
+private ResponseEntity<?> handlePolymersRegistration(Object request) {
+    log.info("Handling polymers registration");
+    try {
+        PolymersRegistrationForm polymerRequest = (PolymersRegistrationForm) request;
+        Optional<PolymersPricingConfig> pcOpt = polymerPricingConfigRepo.findById(polymerRequest.getPricingConfig().getId());
+        if (pcOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Invalid pricingConfig ID.");
+        }
+        PolymersPricingConfig pc = pcOpt.get();
+        if (polymerRequest.getAmountPaid() == null ||
+            polymerRequest.getAmountPaid().compareTo(pc.getTotalPrice()) != 0) {
+            return ResponseEntity.badRequest().body("AmountPaid must match the PricingConfig totalPrice.");
+        }
+        polymerRequest.setPricingConfig(pc);
+        PolymersRegistrationForm saved = polymerRegistrationFormRepository.save(polymerRequest);
+        return ResponseEntity.ok(saved);
+    } catch (ClassCastException e) {
+        log.error("Failed to cast request to PolymersRegistrationForm", e);
+        return ResponseEntity.badRequest().body("Invalid request format for polymers registration");
+    } catch (Exception e) {
+        log.error("Error processing polymer registration", e);
+        return ResponseEntity.status(500).body("Error processing registration");
+    }
+}
     }
     
     private ResponseEntity<?> handleOpticsRegistration(Object request) {
         log.info("Handling optics registration with optics-specific repository");
         
         try {
-            // Cast to the appropriate entity type
+            // Cast to the appropriate entiy type
             OpticsRegistrationForm opticsRequest = (OpticsRegistrationForm) request;
             
             Optional<OpticsPricingConfig> pcOpt = opticsPricingConfigRepo.findById(opticsRequest.getPricingConfig().getId());

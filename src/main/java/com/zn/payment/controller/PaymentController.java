@@ -1,3 +1,4 @@
+
 package com.zn.payment.controller;
 
 import java.io.BufferedReader;
@@ -95,15 +96,22 @@ public class PaymentController {
     @Autowired
     private IOpticsPricingConfigRepository opticsPricingConfigRepository;
     
+
     @Autowired
     private OpticsDiscountsRepository opticsDiscountsRepository;
-    
     @Autowired
     private NursingDiscountsRepository nursingDiscountsRepository;
-    
     @Autowired
     private RenewableDiscountsRepository renewableDiscountsRepository;
-    
+
+    // --- POLYMERS REPOSITORIES & SERVICES ---
+    @Autowired
+    private com.zn.polymers.repository.IPolymersRegistrationFormRepository polymersRegistrationFormRepository;
+    @Autowired
+    private com.zn.polymers.repository.IPolymersPricingConfigRepository polymersPricingConfigRepository;
+    @Autowired
+    private com.zn.payment.polymers.service.PolymersStripeService polymersStripeService;
+
 
     @PostMapping("/create-checkout-session")
     public ResponseEntity<?> createCheckoutSession(@RequestBody CheckoutRequest request, @RequestParam Long pricingConfigId, HttpServletRequest httpRequest) {
@@ -112,7 +120,7 @@ public class PaymentController {
         String origin = httpRequest.getHeader("Origin");
         if (origin == null) {
             origin = httpRequest.getHeader("Referer");
-        }
+        }   
         
         if (origin == null) {
             log.error("Origin or Referer header is missing");
@@ -130,11 +138,62 @@ public class PaymentController {
         } else if (origin.contains("globalrenewablemeet.com")) {
             log.info("Processing Renewable checkout for domain: {}", origin);
             return handleRenewableCheckout(request, pricingConfigId);
+        } else if (origin.contains("polyscienceconference.com")) {
+            log.info("Processing Polymer checkout for domain: {}", origin);
+            return handlePolymerCheckout(request, pricingConfigId);
         } else {
             log.error("Unknown frontend domain: {}", origin);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(createErrorResponse("unknown_frontend_domain"));
         }
+    }
+
+    // --- POLYMERS CHECKOUT LOGIC ---
+    private ResponseEntity<com.zn.payment.polymers.dto.PolymersPaymentResponseDTO> handlePolymerCheckout(CheckoutRequest request, Long pricingConfigId) {
+        try {
+            if (pricingConfigId == null) {
+                log.error("pricingConfigId is mandatory but not provided");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(createPolymersErrorResponse("pricing_config_id_required"));
+            }
+
+            com.zn.polymers.entity.PolymersPricingConfig pricingConfig = polymersPricingConfigRepository.findById(pricingConfigId)
+                    .orElseThrow(() -> new IllegalArgumentException("Pricing config not found with ID: " + pricingConfigId));
+            java.math.BigDecimal backendTotalPrice = pricingConfig.getTotalPrice();
+            Long unitAmountInCents = backendTotalPrice.multiply(new java.math.BigDecimal(100)).longValue();
+            request.setUnitAmount(unitAmountInCents); // Stripe expects cents
+
+            // Save registration record before payment
+            com.zn.polymers.entity.PolymersRegistrationForm registrationForm = new com.zn.polymers.entity.PolymersRegistrationForm();
+            registrationForm.setName(request.getName() != null ? request.getName() : "");
+            registrationForm.setPhone(request.getPhone() != null ? request.getPhone() : "");
+            registrationForm.setEmail(request.getEmail());
+            registrationForm.setInstituteOrUniversity(request.getInstituteOrUniversity() != null ? request.getInstituteOrUniversity() : "");
+            registrationForm.setCountry(request.getCountry() != null ? request.getCountry() : "");
+            registrationForm.setPricingConfig(pricingConfig);
+            registrationForm.setAmountPaid(backendTotalPrice);
+            com.zn.polymers.entity.PolymersRegistrationForm savedRegistration = polymersRegistrationFormRepository.save(registrationForm);
+            log.info("✅ Polymers registration form created and saved with ID: {}", savedRegistration.getId());
+
+            // Call polymers service - this will save to polymers_payment_records table
+            com.zn.payment.polymers.dto.PolymersPaymentResponseDTO response = polymersStripeService.createCheckoutSessionWithPricingValidation(request, pricingConfigId);
+            log.info("Polymers checkout session created successfully. Session ID: {}", response.getSessionId());
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error creating polymers checkout session: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(createPolymersErrorResponse("validation_failed"));
+        } catch (Exception e) {
+            log.error("Error creating polymers checkout session: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createPolymersErrorResponse("failed"));
+        }
+    }
+
+    private com.zn.payment.polymers.dto.PolymersPaymentResponseDTO createPolymersErrorResponse(String errorMessage) {
+        // Use constructor instead of builder (assume fields: paymentStatus, description)
+        return new com.zn.payment.polymers.dto.PolymersPaymentResponseDTO(errorMessage, "Error: " + errorMessage);
     }
 
     @GetMapping("/{id}")
@@ -155,6 +214,9 @@ public class PaymentController {
                 return ResponseEntity.ok(responseDTO);
             } else if (origin != null && origin.contains("globalrenewablemeet.com")) {
                 RenewablePaymentResponseDTO responseDTO = renewableStripeService.retrieveSession(id);
+                return ResponseEntity.ok(responseDTO);
+            } else if (origin != null && origin.contains("polyscienceconference.com")) {
+                com.zn.payment.polymers.dto.PolymersPaymentResponseDTO responseDTO = polymersStripeService.retrieveSession(id);
                 return ResponseEntity.ok(responseDTO);
             } else {
                 log.error("Unknown or missing domain origin: {}", origin);
@@ -185,6 +247,9 @@ public class PaymentController {
                 return ResponseEntity.ok(responseDTO);
             } else if (origin != null && origin.contains("globalrenewablemeet.com")) {
                 RenewablePaymentResponseDTO responseDTO = renewableStripeService.expireSession(id);
+                return ResponseEntity.ok(responseDTO);
+            } else if (origin != null && origin.contains("polyscienceconference.com")) {
+                com.zn.payment.polymers.dto.PolymersPaymentResponseDTO responseDTO = polymersStripeService.expireSession(id);
                 return ResponseEntity.ok(responseDTO);
             } else {
                 log.error("Unknown or missing domain origin: {}", origin);
@@ -289,6 +354,11 @@ public class PaymentController {
                         renewableStripeService.processWebhookEvent(event);
                         log.info("✅ Webhook processed by Renewable service by productName");
                         return ResponseEntity.ok().body("Webhook processed by Renewable service by productName: " + productName);
+                    } else if (productNameUpper.contains("POLYMER") || productNameUpper.contains("POLYMERS")) {
+                        log.info("[Webhook Debug] Routing to Polymers service by productName match.");
+                        polymersStripeService.processWebhookEvent(event);
+                        log.info("✅ Webhook processed by Polymers service by productName");
+                        return ResponseEntity.ok().body("Webhook processed by Polymers service by productName: " + productName);
                     } else {
                         log.warn("[Webhook Debug] productName did not match any site, will try success_url fallback.");
                     }
@@ -319,6 +389,11 @@ public class PaymentController {
                         renewableStripeService.processWebhookEvent(event);
                         log.info("✅ Webhook processed by Renewable service by success_url");
                         return ResponseEntity.ok().body("Webhook processed by Renewable service by success_url");
+                    } else if (urlLower.contains("polyscienceconference.com") || urlLower.contains("polymer")) {
+                        log.info("[Webhook Debug] Routing to Polymers service by success_url/domain match.");
+                        polymersStripeService.processWebhookEvent(event);
+                        log.info("✅ Webhook processed by Polymers service by success_url");
+                        return ResponseEntity.ok().body("Webhook processed by Polymers service by success_url");
                     } else {
                         log.warn("[Webhook Debug] success_url did not match any site. No table will be updated.");
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("success_url did not match any site. No table updated.");

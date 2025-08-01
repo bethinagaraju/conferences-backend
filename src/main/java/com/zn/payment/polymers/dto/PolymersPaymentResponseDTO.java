@@ -2,11 +2,20 @@ package com.zn.payment.polymers.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
+import lombok.Data;
+import lombok.NoArgsConstructor;
+@Data
+@NoArgsConstructor
 public class PolymersPaymentResponseDTO {
     private String sessionId;
     private String url;
     private String paymentStatus;
+    private String description;
+    // Constructor for error responses
+    public PolymersPaymentResponseDTO(String paymentStatus, String description) {
+        this.paymentStatus = paymentStatus;
+        this.description = description;
+    }
     private LocalDateTime stripeCreatedAt;
     private LocalDateTime stripeExpiresAt;
     private Long id;
@@ -31,6 +40,8 @@ public class PolymersPaymentResponseDTO {
     public void setUrl(String url) { this.url = url; }
     public String getPaymentStatus() { return paymentStatus; }
     public void setPaymentStatus(String paymentStatus) { this.paymentStatus = paymentStatus; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
     public LocalDateTime getStripeCreatedAt() { return stripeCreatedAt; }
     public void setStripeCreatedAt(LocalDateTime stripeCreatedAt) { this.stripeCreatedAt = stripeCreatedAt; }
     public LocalDateTime getStripeExpiresAt() { return stripeExpiresAt; }
