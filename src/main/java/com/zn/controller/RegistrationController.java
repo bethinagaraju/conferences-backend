@@ -397,7 +397,7 @@ private ResponseEntity<?> handlePolymersRequest(PriceCalculationRequestDTO reque
             log.warn("Invalid registration type: {}", request.getRegistrationType());
             return ResponseEntity.badRequest().body("Invalid registration type.");
     }
-    if (results.isEmpty()) {
+    if (results.isEmpty()) {    
         log.warn("No polymer pricing configurations found for type={}, registrationType={}, nights={}, guests={}",
                 request.getPresentationType(), request.getRegistrationType(),
                 request.getNumberOfNights(), request.getNumberOfGuests());
@@ -439,7 +439,7 @@ private ResponseEntity<?> handlePolymersRegistration(Object request) {
         log.error("Error processing polymer registration", e);
         return ResponseEntity.status(500).body("Error processing registration");
     }
-}
+// Removed extra closing brace to fix syntax error
     }
     
     private ResponseEntity<?> handleOpticsRegistration(Object request) {
