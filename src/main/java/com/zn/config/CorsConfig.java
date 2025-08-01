@@ -2,7 +2,6 @@
 package com.zn.config;
 
 import java.util.Arrays;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -26,7 +25,8 @@ public class CorsConfig implements WebMvcConfigurer {
                     "http://localhost:*",
                     "https://localhost:*",
                     "http://127.0.0.1:*",
-                    "http://147.93.102.131:*"
+                    "http://147.93.102.131:*",
+                    "https://polyscienceconference.com/*"
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
                 .allowedHeaders("*")
