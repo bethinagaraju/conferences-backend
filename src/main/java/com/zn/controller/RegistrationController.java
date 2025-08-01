@@ -100,41 +100,7 @@ private IPolymersRegistrationFormRepository polymerRegistrationFormRepository;
             return "nursing";
         }
     }
-    
-    
-//    @PostMapping("/get-pricing-config")
-//    public ResponseEntity<?> getPricingConfig(@RequestBody PriceCalculationRequestDTO request) {
-//        if (request == null) {
-//            return ResponseEntity.badRequest().body("Price calculation request is required.");
-//        }
-//
-//        Optional<PresentationType> ptOpt = presentationTypeRepository.findByType(request.getPresentationType());
-//        if (ptOpt.isEmpty()) {
-//            return ResponseEntity.badRequest().body("Invalid presentation type: " + request.getPresentationType());
-//        }
-//        PresentationType ptEntity = ptOpt.get();
-//
-//        switch (request.getRegistrationType()) {
-//            case "REGISTRATION_ONLY":
-//                return pricingConfigRepo
-//                        .findByPresentationTypeAndNoAccommodation(ptEntity)
-//                        .map(PricingConfig::getTotalPrice)
-//                        .<ResponseEntity<?>>map(ResponseEntity::ok)
-//                        .orElse(ResponseEntity.status(404).body("No pricing config found for registration only."));
-//
-//            case "REGISTRATION_AND_ACCOMMODATION":
-//                return pricingConfigRepo
-//                        .findByPresentationTypeAndAccommodationDetails(ptEntity,
-//                                                                       request.getNumberOfNights(),
-//                                                                       request.getNumberOfGuests())
-//                        .map(PricingConfig::getTotalPrice)
-//                        .<ResponseEntity<?>>map(ResponseEntity::ok)
-//                        .orElse(ResponseEntity.status(404).body("No pricing config found for registration with accommodation."));
-//
-//            default:
-//                return ResponseEntity.badRequest().body("Invalid registration type.");
-//        }
-//    }
+
     
     @PostMapping("/get-pricing-config")
     public ResponseEntity<?> getPricingConfigs(@RequestBody PriceCalculationRequestDTO request, HttpServletRequest httpRequest) {

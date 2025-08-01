@@ -1,8 +1,6 @@
 package com.zn.polymers.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.zn.nursing.entity.NursingAccommodation;
-import com.zn.nursing.entity.NursingPresentationType;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -19,11 +17,11 @@ public class PolymersPricingConfig {
 
     @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "presentation_type_id", nullable = false)
-    private NursingPresentationType presentationType;
+    private PolymersPresentationType presentationType;
 
     @ManyToOne
     @JoinColumn(name = "accommodation_option_id")
-    private NursingAccommodation accommodationOption;
+    private PolymersAccommodation accommodationOption;
 
     @Column(nullable = false)
     private double processingFeePercent;
