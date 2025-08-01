@@ -19,7 +19,7 @@ import lombok.Data;
 
 @Entity
 @Data
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler" })
 public class PolymersRegistrationForm {
 
     @Id

@@ -19,10 +19,10 @@ import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import com.stripe.param.checkout.SessionCreateParams;
 import com.zn.payment.dto.CreateDiscountSessionRequest;
-import com.zn.payment.nursing.entity.NursingDiscounts;
-import com.zn.payment.nursing.entity.NursingPaymentRecord;
-import com.zn.payment.nursing.entity.NursingPaymentRecord.PaymentStatus;
-import com.zn.payment.nursing.repository.NursingDiscountsRepository;
+import com.zn.payment.polymers.entity.PolymersDiscounts;
+// ...existing code...
+import com.zn.payment.polymers.entity.PolymersPaymentRecord.PaymentStatus;
+import com.zn.payment.polymers.repository.PolymersDiscountsRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -32,11 +32,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PolymersDiscountsService {
     /**
-     * Update payment status in NursingDiscounts by Stripe session ID
+     * Update payment status in PolymersDiscounts by Stripe session ID
      */
     public boolean updatePaymentStatusBySessionId(String sessionId, String status) {
         log.info("[PolymersDiscountsService][WEBHOOK] Attempting to update payment status for sessionId: {} to {}", sessionId, status);
-        NursingDiscounts discount = discountsRepository.findBySessionId(sessionId);
+        PolymersDiscounts discount = discountsRepository.findBySessionId(sessionId);
         if (discount != null) {
             log.info("[PolymersDiscountsService][WEBHOOK] Found discount for sessionId: {}", sessionId);
             log.info("[PolymersDiscountsService][WEBHOOK] Updating paymentStatus to: {}", status);
@@ -51,13 +51,13 @@ public class PolymersDiscountsService {
     }
 
     /**
-     * Update payment status in NursingDiscounts by Stripe payment intent ID
+     * Update payment status in PolymersDiscounts by Stripe payment intent ID
      */
     public boolean updatePaymentStatusByPaymentIntentId(String paymentIntentId, String status) {
         log.info("[PolymersDiscountsService][WEBHOOK] Attempting to update payment status for paymentIntentId: {} to {}", paymentIntentId, status);
-        java.util.Optional<NursingDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+        java.util.Optional<PolymersDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
         if (discountOpt.isPresent()) {
-            NursingDiscounts discount = discountOpt.get();
+            PolymersDiscounts discount = discountOpt.get();
             log.info("[PolymersDiscountsService][WEBHOOK] Found discount for paymentIntentId: {}", paymentIntentId);
             log.info("[PolymersDiscountsService][WEBHOOK] Updating paymentStatus to: {}", status);
             discount.setPaymentStatus(status);
@@ -76,37 +76,30 @@ public class PolymersDiscountsService {
     private String webhookSecret;
 
     @Autowired
-    private NursingDiscountsRepository discountsRepository;
+    private PolymersDiscountsRepository discountsRepository;
 
     public Object createSession(CreateDiscountSessionRequest request) {
         // Validate request
         if (request.getUnitAmount() == null || request.getUnitAmount().compareTo(BigDecimal.ZERO) <= 0) {
             return Map.of("error", "Unit amount must be positive");
         }
-        if (request.getCurrency() == null || request.getCurrency().isEmpty()) {
-            return Map.of("error", "Currency must be provided");
-        }
-
-        NursingDiscounts discount = new NursingDiscounts();
-        discount.setName(request.getName());
-        discount.setPhone(request.getPhone());
-        discount.setInstituteOrUniversity(request.getInstituteOrUniversity());
-        discount.setCountry(request.getCountry());
-        
-        // Convert euro to cents for Stripe if currency is EUR
-        long unitAmountCents;
-        if ("EUR".equalsIgnoreCase(request.getCurrency())) {
-            unitAmountCents = request.getUnitAmount().multiply(new BigDecimal(100)).longValue();
-        } else {
-            unitAmountCents = request.getUnitAmount().longValue();
-        }
-        discount.setAmountTotal(request.getUnitAmount()); // Save original euro amount for dashboard
-        discount.setCurrency(request.getCurrency());
-        discount.setCustomerEmail(request.getCustomerEmail());
-
         try {
             Stripe.apiKey = secretKey;
-            
+            PolymersDiscounts discount = new PolymersDiscounts();
+            discount.setPhone(request.getPhone());
+            discount.setInstituteOrUniversity(request.getInstituteOrUniversity());
+            discount.setCountry(request.getCountry());
+            // Convert euro to cents for Stripe if currency is EUR
+            long unitAmountCents;
+            if ("EUR".equalsIgnoreCase(request.getCurrency())) {
+                unitAmountCents = request.getUnitAmount().multiply(new BigDecimal(100)).longValue();
+            } else {
+                unitAmountCents = request.getUnitAmount().longValue();
+            }
+            discount.setAmountTotal(request.getUnitAmount()); // Save original euro amount for dashboard
+            discount.setCurrency(request.getCurrency());
+            discount.setCustomerEmail(request.getCustomerEmail());
+
             // Create metadata to identify this as a discount session
             Map<String, String> metadata = new HashMap<>();
             metadata.put("source", "discount-api");
@@ -122,7 +115,7 @@ public class PolymersDiscountsService {
             if (request.getCountry() != null) {
                 metadata.put("customerCountry", request.getCountry());
             }
-            
+
             SessionCreateParams params = SessionCreateParams.builder()
                     .addPaymentMethodType(SessionCreateParams.PaymentMethodType.CARD)
                     .addLineItem(
@@ -202,10 +195,10 @@ public class PolymersDiscountsService {
 
             // Handle the event
             if ("checkout.session.completed".equals(event.getType())) {
-                Session session = (Session) event.getData().getObject();
+                Session session = (Session) event.getDataObjectDeserializer().getObject().orElse(null);
                 String sessionId = session.getId();
                 log.info("[PolymersDiscountsService][WEBHOOK] Processing checkout.session.completed for sessionId: {}", sessionId);
-                NursingDiscounts discount = discountsRepository.findBySessionId(sessionId);
+                PolymersDiscounts discount = discountsRepository.findBySessionId(sessionId);
                 if (discount != null) {
                     discount.setStatus(safeMapStripeStatus(session.getStatus()));
                     discount.setPaymentStatus(session.getPaymentStatus());
@@ -286,15 +279,15 @@ public class PolymersDiscountsService {
                 com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
                 String sessionId = session.getId();
                 // Find the discount record by session ID
-                NursingDiscounts discount = discountsRepository.findBySessionId(sessionId);
+                PolymersDiscounts discount = discountsRepository.findBySessionId(sessionId);
                 if (discount != null) {
-                    discount.setStatus(NursingPaymentRecord.PaymentStatus.COMPLETED);
+                    discount.setStatus(PaymentStatus.COMPLETED);
                     discount.setPaymentIntentId(session.getPaymentIntent());
                     discount.setUpdatedAt(java.time.LocalDateTime.now());
                     discountsRepository.save(discount);
-                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated NursingDiscounts status to SUCCEEDED for session: {}", sessionId);
+                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated PolymersDiscounts status to COMPLETED for session: {}", sessionId);
                 } else {
-                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No NursingDiscounts record found for session: {}", sessionId);
+                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No PolymersDiscounts record found for session: {}", sessionId);
                 }
             }
         } catch (Exception e) {
@@ -311,15 +304,15 @@ public class PolymersDiscountsService {
                 com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
                 String paymentIntentId = paymentIntent.getId();
                 // Find the discount record by payment intent ID
-                java.util.Optional<NursingDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+                java.util.Optional<PolymersDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
                 if (discountOpt.isPresent()) {
-                    NursingDiscounts discount = discountOpt.get();
-                    discount.setStatus(NursingPaymentRecord.PaymentStatus.COMPLETED);
+                    PolymersDiscounts discount = discountOpt.get();
+                    discount.setStatus(PaymentStatus.COMPLETED);
                     discount.setUpdatedAt(java.time.LocalDateTime.now());
                     discountsRepository.save(discount);
-                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated NursingDiscounts status to COMPLETED for payment intent: {}", paymentIntentId);
+                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated PolymersDiscounts status to COMPLETED for payment intent: {}", paymentIntentId);
                 } else {
-                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No NursingDiscounts record found for payment intent: {}", paymentIntentId);
+                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No PolymersDiscounts record found for payment intent: {}", paymentIntentId);
                 }
             }
         } catch (Exception e) {
@@ -336,15 +329,15 @@ public class PolymersDiscountsService {
                 com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
                 String paymentIntentId = paymentIntent.getId();
                 // Find the discount record by payment intent ID
-                java.util.Optional<NursingDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+                java.util.Optional<PolymersDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
                 if (discountOpt.isPresent()) {
-                    NursingDiscounts discount = discountOpt.get();
-                    discount.setStatus(NursingPaymentRecord.PaymentStatus.FAILED);
+                    PolymersDiscounts discount = discountOpt.get();
+                    discount.setStatus(PaymentStatus.FAILED);
                     discount.setUpdatedAt(java.time.LocalDateTime.now());
                     discountsRepository.save(discount);
-                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated NursingDiscounts status to FAILED for payment intent: {}", paymentIntentId);
+                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated PolymersDiscounts status to FAILED for payment intent: {}", paymentIntentId);
                 } else {
-                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No NursingDiscounts record found for payment intent: {}", paymentIntentId);
+                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No PolymersDiscounts record found for payment intent: {}", paymentIntentId);
                 }
             }
         } catch (Exception e) {
