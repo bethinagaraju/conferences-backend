@@ -354,8 +354,7 @@ public class PolymersStripeService {
         paymentRecordRepository.save(record);
         log.info("💾 Saved PolymersPaymentRecord for session: {}", session.getId());
 
-        // 🔄 Auto-sync discount table when payment record is created
-        autoSyncDiscountOnPaymentUpdate(record);
+        // Removed auto-sync: payment creation does NOT insert/update discount table
 
         return session;
 
@@ -469,7 +468,7 @@ public class PolymersStripeService {
                     convertToLocalDateTime(session.getCreated()),
                     pricingConfig.getId());
 
-            // 💾 Save to DB with pricing config relationship - always EUR currency
+        // 💾 Save to DB with pricing config relationship - always EUR currency
         PolymersPaymentRecord record = PolymersPaymentRecord.fromStripeWithPricing(
             session.getId(),
             request.getEmail(),
@@ -480,13 +479,11 @@ public class PolymersStripeService {
             session.getPaymentStatus()
         );
 
-
         paymentRecordRepository.save(record);
         log.info("💾 Saved PolymersPaymentRecord for session: {} with PolymersPricingConfig: {}", 
                 session.getId(), pricingConfig.getId());
 
-        // 🔄 Auto-sync discount table when payment record is created
-        autoSyncDiscountOnPaymentUpdate(record);
+        // Removed auto-sync: payment creation does NOT insert/update discount table
 
         return session;
 
