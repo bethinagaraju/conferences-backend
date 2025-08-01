@@ -94,15 +94,28 @@ public class DiscountsController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Missing signature header");
         }
         try {
-            // Parse event using any service (all use same Stripe event structure)
+            // Prioritize polymers for event construction if domain matches
             Event event = null;
-            try {
-                event = opticsDiscountsService.constructWebhookEvent(payload, sigHeader);
-            } catch (Exception e) {
+            String origin = request.getHeader("Origin");
+            String referer = request.getHeader("Referer");
+            boolean isPolymersDomain = (origin != null && origin.contains("polyscienceconference.com")) ||
+                                       (referer != null && referer.contains("polyscienceconference.com"));
+            if (isPolymersDomain) {
                 try {
-                    event = nursingDiscountsService.constructWebhookEvent(payload, sigHeader);
-                } catch (Exception e2) {
-                    event = renewableDiscountsService.constructWebhookEvent(payload, sigHeader);
+                    event = polymersDiscountsService.constructWebhookEvent(payload, sigHeader);
+                } catch (Exception e) {
+                    log.warn("Polymers constructWebhookEvent failed: {}. Falling back to other services.", e.getMessage());
+                }
+            }
+            if (event == null) {
+                try {
+                    event = opticsDiscountsService.constructWebhookEvent(payload, sigHeader);
+                } catch (Exception e) {
+                    try {
+                        event = nursingDiscountsService.constructWebhookEvent(payload, sigHeader);
+                    } catch (Exception e2) {
+                        event = renewableDiscountsService.constructWebhookEvent(payload, sigHeader);
+                    }
                 }
             }
             if (event == null) {
@@ -115,119 +128,166 @@ public class DiscountsController {
             boolean updated = false;
             String sessionId = null;
             String paymentIntentId = null;
-            if ("checkout.session.completed".equals(eventType)) {
-                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
-                    com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                    sessionId = session.getId();
-                    log.info("Attempting to update discount status to COMPLETED for sessionId: {}", sessionId);
-                    if (opticsDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
-                        log.info("Optics discount record updated for sessionId: {}", sessionId);
-                        updated = true;
-                        try { paymentSyncService.syncOpticsPaymentBySessionId(sessionId); } catch (Exception e) { log.warn("Optics sync failed: {}", e.getMessage()); }
-                    } else if (nursingDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
-                        log.info("Nursing discount record updated for sessionId: {}", sessionId);
-                        updated = true;
-                        try { paymentSyncService.syncNursingPaymentBySessionId(sessionId); } catch (Exception e) { log.warn("Nursing sync failed: {}", e.getMessage()); }
-                    } else if (renewableDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
-                        log.info("Renewable discount record updated for sessionId: {}", sessionId);
-                        updated = true;
-                        try { paymentSyncService.syncRenewablePaymentBySessionId(sessionId); } catch (Exception e) { log.warn("Renewable sync failed: {}", e.getMessage()); }
-                    } else if (polymersDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
-                        log.info("Polymers discount record updated for sessionId: {}", sessionId);
-                        updated = true;
-                        // Add sync logic for polymers if needed
-                    } else {
-                        log.warn("No discount record found to update for sessionId: {}", sessionId);
+            if (isPolymersDomain) {
+                // Always try polymers first for status update
+                if ("checkout.session.completed".equals(eventType)) {
+                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                    if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
+                        com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
+                        sessionId = session.getId();
+                        log.info("[Polymers] Attempting to update discount status to COMPLETED for sessionId: {}", sessionId);
+                        if (polymersDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
+                            log.info("[Polymers] Discount record updated for sessionId: {}", sessionId);
+                            updated = true;
+                        } else {
+                            log.warn("[Polymers] No discount record found to update for sessionId: {}", sessionId);
+                        }
                     }
+                } else if ("payment_intent.succeeded".equals(eventType)) {
+                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                    if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                        com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                        paymentIntentId = paymentIntent.getId();
+                        log.info("[Polymers] Attempting to update discount status to SUCCEEDED for paymentIntentId: {}", paymentIntentId);
+                        if (polymersDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
+                            log.info("[Polymers] Discount record updated for paymentIntentId: {}", paymentIntentId);
+                            updated = true;
+                        } else {
+                            log.warn("[Polymers] No discount record found to update for paymentIntentId: {}", paymentIntentId);
+                        }
+                    }
+                } else if ("payment_intent.payment_failed".equals(eventType)) {
+                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                    if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                        com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                        paymentIntentId = paymentIntent.getId();
+                        log.info("[Polymers] Attempting to update discount status to FAILED for paymentIntentId: {}", paymentIntentId);
+                        if (polymersDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
+                            log.info("[Polymers] Discount record updated for paymentIntentId: {}", paymentIntentId);
+                            updated = true;
+                        } else {
+                            log.warn("[Polymers] No discount record found to update for paymentIntentId: {}", paymentIntentId);
+                        }
+                    }
+                } else {
+                    updated = true; // Consider unhandled events as processed
                 }
-            } else if ("payment_intent.succeeded".equals(eventType)) {
-                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
-                    com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                    paymentIntentId = paymentIntent.getId();
-                    log.info("Attempting to update discount status to SUCCEEDED for paymentIntentId: {}", paymentIntentId);
-                    if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
-                        log.info("Optics discount record updated for paymentIntentId: {}", paymentIntentId);
-                        updated = true;
-                    } else if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
-                        log.info("Nursing discount record updated for paymentIntentId: {}", paymentIntentId);
-                        updated = true;
-                    } else if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
-                        log.info("Renewable discount record updated for paymentIntentId: {}", paymentIntentId);
-                        updated = true;
-                    } else if (polymersDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
-                        log.info("Polymers discount record updated for paymentIntentId: {}", paymentIntentId);
-                        updated = true;
-                    } else {
-                        log.warn("No discount record found to update for paymentIntentId: {}", paymentIntentId);
-                        if (paymentIntent.getMetadata() != null && paymentIntent.getMetadata().containsKey("sessionId")) {
-                            String associatedSessionId = paymentIntent.getMetadata().get("sessionId");
-                            log.info("Attempting to update discount status to SUCCEEDED for associatedSessionId: {}", associatedSessionId);
-                            if (opticsDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "SUCCEEDED")) {
-                                log.info("Optics discount record updated for associatedSessionId: {}", associatedSessionId);
-                                updated = true;
-                            } else if (nursingDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "SUCCEEDED")) {
-                                log.info("Nursing discount record updated for associatedSessionId: {}", associatedSessionId);
-                                updated = true;
-                            } else if (renewableDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "SUCCEEDED")) {
-                                log.info("Renewable discount record updated for associatedSessionId: {}", associatedSessionId);
-                                updated = true;
-                            } else if (polymersDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "SUCCEEDED")) {
-                                log.info("Polymers discount record updated for associatedSessionId: {}", associatedSessionId);
-                                updated = true;
+            }
+            // If not polymers domain, fallback to original logic
+            if (!isPolymersDomain) {
+                if ("checkout.session.completed".equals(eventType)) {
+                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                    if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
+                        com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
+                        sessionId = session.getId();
+                        log.info("Attempting to update discount status to COMPLETED for sessionId: {}", sessionId);
+                        if (opticsDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
+                            log.info("Optics discount record updated for sessionId: {}", sessionId);
+                            updated = true;
+                            try { paymentSyncService.syncOpticsPaymentBySessionId(sessionId); } catch (Exception e) { log.warn("Optics sync failed: {}", e.getMessage()); }
+                        } else if (nursingDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
+                            log.info("Nursing discount record updated for sessionId: {}", sessionId);
+                            updated = true;
+                            try { paymentSyncService.syncNursingPaymentBySessionId(sessionId); } catch (Exception e) { log.warn("Nursing sync failed: {}", e.getMessage()); }
+                        } else if (renewableDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
+                            log.info("Renewable discount record updated for sessionId: {}", sessionId);
+                            updated = true;
+                            try { paymentSyncService.syncRenewablePaymentBySessionId(sessionId); } catch (Exception e) { log.warn("Renewable sync failed: {}", e.getMessage()); }
+                        } else if (polymersDiscountsService.updatePaymentStatusBySessionId(sessionId, "COMPLETED")) {
+                            log.info("Polymers discount record updated for sessionId: {}", sessionId);
+                            updated = true;
+                        } else {
+                            log.warn("No discount record found to update for sessionId: {}", sessionId);
+                        }
+                    }
+                } else if ("payment_intent.succeeded".equals(eventType)) {
+                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                    if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                        com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                        paymentIntentId = paymentIntent.getId();
+                        log.info("Attempting to update discount status to SUCCEEDED for paymentIntentId: {}", paymentIntentId);
+                        if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
+                            log.info("Optics discount record updated for paymentIntentId: {}", paymentIntentId);
+                            updated = true;
+                        } else if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
+                            log.info("Nursing discount record updated for paymentIntentId: {}", paymentIntentId);
+                            updated = true;
+                        } else if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
+                            log.info("Renewable discount record updated for paymentIntentId: {}", paymentIntentId);
+                            updated = true;
+                        } else if (polymersDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "SUCCEEDED")) {
+                            log.info("Polymers discount record updated for paymentIntentId: {}", paymentIntentId);
+                            updated = true;
+                        } else {
+                            log.warn("No discount record found to update for paymentIntentId: {}", paymentIntentId);
+                            if (paymentIntent.getMetadata() != null && paymentIntent.getMetadata().containsKey("sessionId")) {
+                                String associatedSessionId = paymentIntent.getMetadata().get("sessionId");
+                                log.info("Attempting to update discount status to SUCCEEDED for associatedSessionId: {}", associatedSessionId);
+                                if (opticsDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "SUCCEEDED")) {
+                                    log.info("Optics discount record updated for associatedSessionId: {}", associatedSessionId);
+                                    updated = true;
+                                } else if (nursingDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "SUCCEEDED")) {
+                                    log.info("Nursing discount record updated for associatedSessionId: {}", associatedSessionId);
+                                    updated = true;
+                                } else if (renewableDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "SUCCEEDED")) {
+                                    log.info("Renewable discount record updated for associatedSessionId: {}", associatedSessionId);
+                                    updated = true;
+                                } else if (polymersDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "SUCCEEDED")) {
+                                    log.info("Polymers discount record updated for associatedSessionId: {}", associatedSessionId);
+                                    updated = true;
+                                } else {
+                                    log.warn("No discount record found to update for associatedSessionId: {}", associatedSessionId);
+                                }
                             } else {
-                                log.warn("No discount record found to update for associatedSessionId: {}", associatedSessionId);
-                            }
-                        } else {
-                            try { opticsDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e) {
-                                try { nursingDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e2) {
-                                    try { renewableDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e3) {
-                                        try { polymersDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e4) {}
+                                try { opticsDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e) {
+                                    try { nursingDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e2) {
+                                        try { renewableDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e3) {
+                                            try { polymersDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e4) {}
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-            } else if ("payment_intent.payment_failed".equals(eventType)) {
-                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
-                    com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                    paymentIntentId = paymentIntent.getId();
-                    if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
-                        updated = true;
-                    } else if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
-                        updated = true;
-                    } else if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
-                        updated = true;
-                    } else if (polymersDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
-                        updated = true;
-                    } else {
-                        if (paymentIntent.getMetadata() != null && paymentIntent.getMetadata().containsKey("sessionId")) {
-                            String associatedSessionId = paymentIntent.getMetadata().get("sessionId");
-                            if (opticsDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "FAILED")) {
-                                updated = true;
-                            } else if (nursingDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "FAILED")) {
-                                updated = true;
-                            } else if (renewableDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "FAILED")) {
-                                updated = true;
-                            } else if (polymersDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "FAILED")) {
-                                updated = true;
-                            }
+                } else if ("payment_intent.payment_failed".equals(eventType)) {
+                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                    if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                        com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                        paymentIntentId = paymentIntent.getId();
+                        if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
+                            updated = true;
+                        } else if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
+                            updated = true;
+                        } else if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
+                            updated = true;
+                        } else if (polymersDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntentId, "FAILED")) {
+                            updated = true;
                         } else {
-                            try { opticsDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e) {
-                                try { nursingDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e2) {
-                                    try { renewableDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e3) {
-                                        try { polymersDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e4) {}
+                            if (paymentIntent.getMetadata() != null && paymentIntent.getMetadata().containsKey("sessionId")) {
+                                String associatedSessionId = paymentIntent.getMetadata().get("sessionId");
+                                if (opticsDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "FAILED")) {
+                                    updated = true;
+                                } else if (nursingDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "FAILED")) {
+                                    updated = true;
+                                } else if (renewableDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "FAILED")) {
+                                    updated = true;
+                                } else if (polymersDiscountsService.updatePaymentStatusBySessionId(associatedSessionId, "FAILED")) {
+                                    updated = true;
+                                }
+                            } else {
+                                try { opticsDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e) {
+                                    try { nursingDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e2) {
+                                        try { renewableDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e3) {
+                                            try { polymersDiscountsService.processWebhookEvent(event); updated = true; } catch (Exception e4) {}
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+                } else {
+                    updated = true; // Consider unhandled events as processed to avoid errors
                 }
-            } else {
-                updated = true; // Consider unhandled events as processed to avoid errors
             }
             if (updated) {
                 log.info("✅ Discount webhook processed and discount table updated.");

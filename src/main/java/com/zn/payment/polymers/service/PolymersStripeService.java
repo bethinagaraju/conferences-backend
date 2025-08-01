@@ -352,9 +352,7 @@ public class PolymersStripeService {
             .build();
 
         paymentRecordRepository.save(record);
-        log.info("💾 Saved PolymersPaymentRecord for session: {}", session.getId());
-
-        // Removed auto-sync: payment creation does NOT insert/update discount table
+        log.info("💾 Payment record created in PolymersPaymentRecord table for session: {}. No discount record created.", session.getId());
 
         return session;
 
@@ -480,10 +478,8 @@ public class PolymersStripeService {
         );
 
         paymentRecordRepository.save(record);
-        log.info("💾 Saved PolymersPaymentRecord for session: {} with PolymersPricingConfig: {}", 
+        log.info("💾 Payment record created in PolymersPaymentRecord table for session: {} with PolymersPricingConfig: {}. No discount record created.", 
                 session.getId(), pricingConfig.getId());
-
-        // Removed auto-sync: payment creation does NOT insert/update discount table
 
         return session;
 
