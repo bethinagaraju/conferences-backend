@@ -326,24 +326,51 @@ public class PolymersDiscountsService {
         log.info("🎯 [PolymersDiscountsService][WEBHOOK] Handling polymers discount checkout.session.completed");
         try {
             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
-                com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                String sessionId = session.getId();
-                log.info("🔍 [PolymersDiscountsService][WEBHOOK] Looking for discount record with sessionId: {}", sessionId);
+            log.info("🔍 [PolymersDiscountsService][WEBHOOK] StripeObject present: {}", stripeObjectOpt.isPresent());
+            
+            if (stripeObjectOpt.isPresent()) {
+                com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
+                log.info("🔍 [PolymersDiscountsService][WEBHOOK] StripeObject type: {}", stripeObject.getClass().getSimpleName());
                 
-                // Find the discount record by session ID
-                PolymersDiscounts discount = discountsRepository.findBySessionId(sessionId);
-                if (discount != null) {
-                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Found existing discount record with ID: {}, current status: {}", discount.getId(), discount.getStatus());
-                    discount.setStatus(PaymentStatus.COMPLETED);
-                    discount.setPaymentIntentId(session.getPaymentIntent());
-                    discount.setUpdatedAt(java.time.LocalDateTime.now());
-                    discountsRepository.save(discount);
-                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated PolymersDiscounts status to COMPLETED for session: {}", sessionId);
+                if (stripeObject instanceof com.stripe.model.checkout.Session) {
+                    com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObject;
+                    String sessionId = session.getId();
+                    log.info("🔍 [PolymersDiscountsService][WEBHOOK] Looking for discount record with sessionId: {}", sessionId);
+                    
+                    // Find the discount record by session ID
+                    PolymersDiscounts discount = discountsRepository.findBySessionId(sessionId);
+                    if (discount != null) {
+                        log.info("✅ [PolymersDiscountsService][WEBHOOK] Found existing discount record with ID: {}, current status: {}", discount.getId(), discount.getStatus());
+                        discount.setStatus(PaymentStatus.COMPLETED);
+                        discount.setPaymentStatus("COMPLETED");
+                        if (session.getPaymentIntent() != null) {
+                            discount.setPaymentIntentId(session.getPaymentIntent());
+                            log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated paymentIntentId to: {}", session.getPaymentIntent());
+                        }
+                        discount.setUpdatedAt(java.time.LocalDateTime.now());
+                        discountsRepository.save(discount);
+                        log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated PolymersDiscounts status to COMPLETED for session: {}", sessionId);
+                        
+                        // Log the updated record details
+                        log.info("✅ [PolymersDiscountsService][WEBHOOK] Final record state - ID: {}, status: {}, paymentStatus: {}, paymentIntentId: {}", 
+                                discount.getId(), discount.getStatus(), discount.getPaymentStatus(), discount.getPaymentIntentId());
+                    } else {
+                        log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No PolymersDiscounts record found for session: {}", sessionId);
+                        log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] This should not happen! The record should have been created during session creation.");
+                        
+                        // List all records to debug
+                        java.util.List<PolymersDiscounts> allDiscounts = discountsRepository.findAll();
+                        log.info("🔍 [PolymersDiscountsService][WEBHOOK] Total discount records in database: {}", allDiscounts.size());
+                        for (PolymersDiscounts d : allDiscounts) {
+                            log.info("🔍 [PolymersDiscountsService][WEBHOOK] Existing record - ID: {}, sessionId: {}, paymentIntentId: {}", 
+                                    d.getId(), d.getSessionId(), d.getPaymentIntentId());
+                        }
+                    }
                 } else {
-                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No PolymersDiscounts record found for session: {}", sessionId);
-                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] This should not happen! The record should have been created during session creation.");
+                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] StripeObject is not a Session: {}", stripeObject.getClass().getSimpleName());
                 }
+            } else {
+                log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No StripeObject found in event");
             }
         } catch (Exception e) {
             log.error("❌ [PolymersDiscountsService][WEBHOOK] Error handling polymers discount checkout.session.completed: {}", e.getMessage(), e);
@@ -355,24 +382,62 @@ public class PolymersDiscountsService {
         log.info("🎯 [PolymersDiscountsService][WEBHOOK] Handling polymers discount payment_intent.succeeded");
         try {
             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
-                com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                String paymentIntentId = paymentIntent.getId();
-                log.info("🔍 [PolymersDiscountsService][WEBHOOK] Looking for discount record with paymentIntentId: {}", paymentIntentId);
+            log.info("🔍 [PolymersDiscountsService][WEBHOOK] StripeObject present: {}", stripeObjectOpt.isPresent());
+            
+            if (stripeObjectOpt.isPresent()) {
+                com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
+                log.info("🔍 [PolymersDiscountsService][WEBHOOK] StripeObject type: {}", stripeObject.getClass().getSimpleName());
                 
-                // Find the discount record by payment intent ID
-                java.util.Optional<PolymersDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
-                if (discountOpt.isPresent()) {
-                    PolymersDiscounts discount = discountOpt.get();
-                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Found existing discount record with ID: {}, current status: {}", discount.getId(), discount.getStatus());
-                    discount.setStatus(PaymentStatus.COMPLETED);
-                    discount.setUpdatedAt(java.time.LocalDateTime.now());
-                    discountsRepository.save(discount);
-                    log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated PolymersDiscounts status to COMPLETED for payment intent: {}", paymentIntentId);
+                if (stripeObject instanceof com.stripe.model.PaymentIntent) {
+                    com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObject;
+                    String paymentIntentId = paymentIntent.getId();
+                    log.info("🔍 [PolymersDiscountsService][WEBHOOK] Looking for discount record with paymentIntentId: {}", paymentIntentId);
+                    
+                    // Try to find by session ID first (since paymentIntentId might be null in our records)
+                    // Look for records with matching metadata
+                    java.util.List<PolymersDiscounts> allDiscounts = discountsRepository.findAll();
+                    log.info("🔍 [PolymersDiscountsService][WEBHOOK] Total discount records in database: {}", allDiscounts.size());
+                    
+                    PolymersDiscounts matchingDiscount = null;
+                    for (PolymersDiscounts discount : allDiscounts) {
+                        log.info("🔍 [PolymersDiscountsService][WEBHOOK] Checking discount ID: {}, sessionId: {}, paymentIntentId: {}", 
+                                discount.getId(), discount.getSessionId(), discount.getPaymentIntentId());
+                        if (paymentIntentId.equals(discount.getPaymentIntentId())) {
+                            matchingDiscount = discount;
+                            break;
+                        }
+                    }
+                    
+                    // Find the discount record by payment intent ID
+                    java.util.Optional<PolymersDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
+                    if (discountOpt.isPresent()) {
+                        PolymersDiscounts discount = discountOpt.get();
+                        log.info("✅ [PolymersDiscountsService][WEBHOOK] Found existing discount record with ID: {}, current status: {}", discount.getId(), discount.getStatus());
+                        discount.setStatus(PaymentStatus.COMPLETED);
+                        discount.setPaymentStatus("SUCCEEDED");
+                        discount.setUpdatedAt(java.time.LocalDateTime.now());
+                        discountsRepository.save(discount);
+                        log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated PolymersDiscounts status to COMPLETED for payment intent: {}", paymentIntentId);
+                    } else {
+                        log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No PolymersDiscounts record found for payment intent: {}", paymentIntentId);
+                        log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] Manual search result: {}", matchingDiscount != null ? "Found match with ID: " + matchingDiscount.getId() : "No match found");
+                        
+                        // If we found a match manually, update it
+                        if (matchingDiscount != null) {
+                            log.info("✅ [PolymersDiscountsService][WEBHOOK] Using manually found discount record with ID: {}", matchingDiscount.getId());
+                            matchingDiscount.setStatus(PaymentStatus.COMPLETED);
+                            matchingDiscount.setPaymentStatus("SUCCEEDED");
+                            matchingDiscount.setPaymentIntentId(paymentIntentId); // Update the paymentIntentId
+                            matchingDiscount.setUpdatedAt(java.time.LocalDateTime.now());
+                            discountsRepository.save(matchingDiscount);
+                            log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated PolymersDiscounts status to COMPLETED for manually found record");
+                        }
+                    }
                 } else {
-                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No PolymersDiscounts record found for payment intent: {}", paymentIntentId);
-                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] This should not happen! The record should have been created during session creation.");
+                    log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] StripeObject is not a PaymentIntent: {}", stripeObject.getClass().getSimpleName());
                 }
+            } else {
+                log.warn("⚠️ [PolymersDiscountsService][WEBHOOK] No StripeObject found in event");
             }
         } catch (Exception e) {
             log.error("❌ [PolymersDiscountsService][WEBHOOK] Error handling polymers discount payment_intent.succeeded: {}", e.getMessage(), e);
