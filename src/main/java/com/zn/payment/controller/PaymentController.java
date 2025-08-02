@@ -324,6 +324,8 @@ public class PaymentController {
                 String productName = null;
                 String paymentType = null;
                 String source = null;
+                
+                // First try reflection-based extraction
                 try {
                     java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                     if (stripeObjectOpt.isPresent()) {
@@ -346,6 +348,29 @@ public class PaymentController {
                     }
                 } catch (Exception ex) {
                     log.warn("[Webhook Debug] Could not extract productName/paymentType/source from event: {}", ex.getMessage());
+                }
+
+                // If reflection failed, try JSON parsing as fallback
+                if (productName == null && paymentType == null && source == null) {
+                    try {
+                        String eventJson = event.toJson();
+                        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                        com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(eventJson);
+                        com.fasterxml.jackson.databind.JsonNode metadataNode = root.path("data").path("object").path("metadata");
+                        if (metadataNode != null && !metadataNode.isMissingNode()) {
+                            if (metadataNode.has("productName")) {
+                                productName = metadataNode.get("productName").asText();
+                            }
+                            if (metadataNode.has("paymentType")) {
+                                paymentType = metadataNode.get("paymentType").asText();
+                            }
+                            if (metadataNode.has("source")) {
+                                source = metadataNode.get("source").asText();
+                            }
+                        }
+                    } catch (Exception ex) {
+                        log.warn("[Webhook Debug] JSON parsing for metadata also failed: {}", ex.getMessage());
+                    }
                 }
 
                 // Debug the extracted metadata values
@@ -391,15 +416,34 @@ public class PaymentController {
                         log.warn("[Webhook Debug] productName did not match any site, will try success_url fallback.");
                     }
                 }
-                // 3. Fallback: Try to extract success_url from event JSON
+                // 3. Fallback: Try to extract success_url from event JSON and check for discount patterns in raw JSON
                 String successUrl = null;
+                String rawJsonEventData = null;
                 try {
                     com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                    com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(event.toJson());
+                    rawJsonEventData = event.toJson();
+                    com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(rawJsonEventData);
                     successUrl = findSuccessUrlRecursive(root);
                 } catch (Exception ex) {
                     log.warn("[Webhook Debug] Could not extract success_url from event JSON: {}", ex.getMessage());
                 }
+
+                // CRITICAL: Check raw JSON for discount patterns even if metadata extraction failed
+                if (rawJsonEventData != null) {
+                    String jsonUpper = rawJsonEventData.toUpperCase();
+                    if (jsonUpper.contains("DISCOUNT REGISTRATION") || 
+                        jsonUpper.contains("DISCOUNT REQUEST") ||
+                        jsonUpper.contains("\"PAYMENTTYPE\":\"DISCOUNT-REGISTRATION\"") ||
+                        jsonUpper.contains("\"SOURCE\":\"DISCOUNT-API\"") ||
+                        jsonUpper.contains("OPTICS 2026 DISCOUNT") ||
+                        jsonUpper.contains("NURSING 2026 DISCOUNT") ||
+                        jsonUpper.contains("RENEWABLE 2025 DISCOUNT") ||
+                        jsonUpper.contains("POLYMER SUMMIT 2026 DISCOUNT")) {
+                        log.info("[Webhook Debug] DISCOUNT PATTERN DETECTED in raw JSON. Skipping payment webhook processing. This should be handled by /api/discounts/webhook.");
+                        return ResponseEntity.ok("Discount payment detected in raw JSON - ignored in payment webhook");
+                    }
+                }
+
                 if (successUrl != null && !successUrl.isEmpty()) {
                     String urlLower = successUrl.toLowerCase();
                     if (urlLower.contains("globallopmeet.com") || urlLower.contains("optics")) {
