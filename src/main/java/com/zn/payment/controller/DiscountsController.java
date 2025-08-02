@@ -82,7 +82,7 @@ public class DiscountsController {
     // handle stripe webhook - ONLY for discount payments
     @PostMapping("/webhook")
     public ResponseEntity<String> handleStripeWebhook(HttpServletRequest request) throws IOException {
-        log.info("Received DISCOUNT webhook request");
+        log.info("##############    Received DISCOUNT webhook request  ##################");
         String payload;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(request.getInputStream()))) {
             payload = reader.lines().collect(Collectors.joining("\n"));

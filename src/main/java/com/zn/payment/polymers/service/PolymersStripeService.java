@@ -25,9 +25,7 @@ import com.stripe.net.Webhook;
 import com.stripe.param.checkout.SessionCreateParams;
 import com.zn.payment.dto.CheckoutRequest;
 import com.zn.payment.polymers.dto.PolymersPaymentResponseDTO;
-import com.zn.payment.polymers.entity.PolymersDiscounts;
 import com.zn.payment.polymers.entity.PolymersPaymentRecord;
-import com.zn.payment.polymers.repository.PolymersDiscountsRepository;
 import com.zn.payment.polymers.repository.PolymersPaymentRecordRepository;
 import com.zn.polymers.entity.PolymersPricingConfig;
 import com.zn.polymers.entity.PolymersRegistrationForm;
@@ -88,118 +86,11 @@ public class PolymersStripeService {
     @Autowired
     private IPolymersRegistrationFormRepository registrationFormRepository;
     
-    @Autowired
-    private PolymersDiscountsRepository discountsRepository;
-    
     private LocalDateTime convertToLocalDateTime(Long timestamp) {
         if (timestamp == null) return null;
         return Instant.ofEpochSecond(timestamp)
                      .atZone(US_ZONE)
                      .toLocalDateTime();
-    }
-
-    /**
-     * Auto-sync discount table when payment record is updated
-     * This implements the constraint that discount table should be updated whenever payment record changes
-     */
-    /**
-     * Auto-sync discount table when payment record is updated
-     * This implements the constraint that discount table should be updated whenever payment record changes
-     * Now uses database sync function for better consistency
-     */
-    private void autoSyncDiscountOnPaymentUpdate(PolymersPaymentRecord paymentRecord) {
-        if (paymentRecord == null || paymentRecord.getSessionId() == null) {
-            log.warn("⚠️ Cannot auto-sync discount: payment record or session ID is null");
-            return;
-        }
-        
-        log.info("🔄 Auto-syncing discount for payment record ID: {} with session: {}", 
-                 paymentRecord.getId(), paymentRecord.getSessionId());
-        
-        try {
-            // Call database sync function - this replaces the manual field copying
-            String syncResult = paymentRecordRepository.syncPolymersBySessionId(paymentRecord.getSessionId());
-            log.info("✅ Database sync result: {}", syncResult);
-            
-            // Fallback to manual sync if database function indicates no discount record exists
-            if (syncResult != null && syncResult.contains("Only Polymers payment record exists")) {
-                log.info("📝 Creating new PolymersDiscounts record for session: {}", paymentRecord.getSessionId());
-                PolymersDiscounts discount = new PolymersDiscounts();
-                discount.setSessionId(paymentRecord.getSessionId());
-                
-                // Sync all fields from payment record to discount record
-                syncDiscountFields(paymentRecord, discount);
-                
-                // Save the discount record
-                PolymersDiscounts savedDiscount = discountsRepository.save(discount);
-                log.info("✅ Created new PolymersDiscounts ID: {} synced with PaymentRecord ID: {}", 
-                         savedDiscount.getId(), paymentRecord.getId());
-                
-                // Run sync again to ensure consistency
-                String secondSyncResult = paymentRecordRepository.syncPolymersBySessionId(paymentRecord.getSessionId());
-                log.info("✅ Second sync result: {}", secondSyncResult);
-            }
-            
-        } catch (Exception e) {
-            log.error("❌ Database sync failed for session {}: {}", paymentRecord.getSessionId(), e.getMessage());
-            
-            // Fallback to manual sync on error
-            try {
-                log.info("🔄 Falling back to manual sync for session: {}", paymentRecord.getSessionId());
-                PolymersDiscounts discount = discountsRepository.findBySessionId(paymentRecord.getSessionId());
-                boolean isNewDiscount = (discount == null);
-                
-                if (isNewDiscount) {
-                    log.info("📝 Creating new PolymersDiscounts record for session: {}", paymentRecord.getSessionId());
-                    discount = new PolymersDiscounts();
-                    discount.setSessionId(paymentRecord.getSessionId());
-                } else {
-                    log.info("📝 Updating existing PolymersDiscounts ID: {} for session: {}", 
-                             discount.getId() != null ? discount.getId() : "null", paymentRecord.getSessionId());
-                }
-                
-                // Sync all fields from payment record to discount record
-                syncDiscountFields(paymentRecord, discount);
-                
-                // Save the discount record
-                PolymersDiscounts savedDiscount = discountsRepository.save(discount);
-                
-                if (isNewDiscount) {
-                    log.info("✅ Created new PolymersDiscounts ID: {} synced with PaymentRecord ID: {}", 
-                             savedDiscount.getId(), paymentRecord.getId());
-                } else {
-                    log.info("✅ Updated PolymersDiscounts ID: {} synced with PaymentRecord ID: {}", 
-                             savedDiscount.getId(), paymentRecord.getId());
-                }
-                
-            } catch (Exception fallbackException) {
-                log.error("❌ Manual sync fallback also failed for payment record ID {}: {}", 
-                          paymentRecord.getId(), fallbackException.getMessage());
-            }
-        }
-    }
-    
-    /**
-     * Sync fields from payment record to discount record
-     */
-    private void syncDiscountFields(PolymersPaymentRecord source, PolymersDiscounts target) {
-        // Core payment fields
-        target.setCustomerEmail(source.getCustomerEmail());
-        target.setAmountTotal(source.getAmountTotal());
-        target.setCurrency(source.getCurrency());
-        target.setPaymentIntentId(source.getPaymentIntentId());
-        target.setStripeCreatedAt(source.getStripeCreatedAt());
-        target.setStripeExpiresAt(source.getStripeExpiresAt());
-        target.setPaymentStatus(source.getPaymentStatus());
-        
-        // Map PaymentRecord status to Discount status
-        if (source.getStatus() != null) {
-            target.setStatus(source.getStatus());
-        }
-        
-        log.debug("🔄 Synced fields: email={}, amount={}, currency={}, status={}", 
-                  target.getCustomerEmail(), target.getAmountTotal(), 
-                  target.getCurrency(), target.getStatus());
     }
 
     public PolymersPaymentResponseDTO mapSessionToResponseDTO(Session session) {
@@ -923,9 +814,6 @@ public class PolymersStripeService {
                 log.info("💾 ✅ Updated PolymersPaymentRecord ID: {} for session: {} to COMPLETED status with paymentStatus '{}'", 
                         savedRecord.getId(), sessionId, savedRecord.getPaymentStatus());
                 
-                // 🔄 Auto-sync discount table when payment record is updated
-                autoSyncDiscountOnPaymentUpdate(savedRecord);
-                
                 // Log the current state for debugging
                 log.info("🔍 PolymersPaymentRecord state after manual update: ID={}, Status={}, PaymentStatus={}, PaymentIntentId={}", 
                         savedRecord.getId(), savedRecord.getStatus(), savedRecord.getPaymentStatus(), savedRecord.getPaymentIntentId());
@@ -991,9 +879,6 @@ public class PolymersStripeService {
             registrationFormRepository.save(existingRegistration);
             paymentRecordRepository.save(paymentRecord);
             
-            // 🔄 Auto-sync discount table when payment record is updated
-            autoSyncDiscountOnPaymentUpdate(paymentRecord);
-            
             log.info("✅ Successfully linked polymers registration form ID: {} to polymers payment record ID: {}", 
                     existingRegistration.getId(), paymentRecord.getId());
         } catch (Exception e) {
@@ -1051,9 +936,6 @@ public class PolymersStripeService {
                 PolymersPaymentRecord savedRecord = paymentRecordRepository.save(paymentRecord);
                 log.info("💾 ✅ Updated PolymersPaymentRecord ID: {} for session: {} to COMPLETED status with paymentStatus '{}'", 
                         savedRecord.getId(), session.getId(), savedRecord.getPaymentStatus());
-                
-                // 🔄 Auto-sync discount table when payment record is updated
-                autoSyncDiscountOnPaymentUpdate(savedRecord);
                 
                 log.info("🔍 PolymersPaymentRecord final state: ID={}, Status={}, PaymentStatus={}, PaymentIntentId={}, Amount={} EUR", 
                         savedRecord.getId(), savedRecord.getStatus(), savedRecord.getPaymentStatus(), 
@@ -1419,9 +1301,6 @@ public PolymersPaymentResponseDTO retrieveSession(String sessionId) throws Strip
             registrationFormRepository.save(existingRegistration);
             paymentRecordRepository.save(paymentRecord);
             
-            // 🔄 Auto-sync discount table when payment record is updated
-            autoSyncDiscountOnPaymentUpdate(paymentRecord);
-            
             log.info("✅ Successfully linked registration form ID: {} to payment record ID: {}", 
                     existingRegistration.getId(), paymentRecord.getId());
             
@@ -1456,9 +1335,6 @@ public PolymersPaymentResponseDTO retrieveSession(String sessionId) throws Strip
             // Save both entities to persist the relationship
             registrationFormRepository.save(registrationForm);
             paymentRecordRepository.save(paymentRecord);
-            
-            // 🔄 Auto-sync discount table when payment record is updated
-            autoSyncDiscountOnPaymentUpdate(paymentRecord);
             
             log.info("✅ Successfully linked registration form ID: {} to payment record ID: {} for session: {}", 
                     registrationFormId, paymentRecord.getId(), sessionId);

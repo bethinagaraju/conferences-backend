@@ -265,7 +265,7 @@ public class PaymentController {
 
     @PostMapping("/webhook")
     public ResponseEntity<String> handleWebhook(HttpServletRequest request) throws IOException {
-        log.info("Received webhook request");
+        log.info("#####################   Received payment webhook request ######################");
         String payload;
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(request.getInputStream()))) {
             payload = reader.lines().collect(Collectors.joining("\n"));
