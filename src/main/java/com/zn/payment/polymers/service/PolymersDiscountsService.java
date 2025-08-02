@@ -48,8 +48,9 @@ public class PolymersDiscountsService {
             // Update main status based on payment status - same logic as payment webhook
             if ("COMPLETED".equals(status) || "paid".equals(status)) {
                 discount.setStatus(PaymentStatus.COMPLETED);
-            } else if ("FAILED".equals(status) || "SUCCEEDED".equals(status)) {
+            } else if ("SUCCEEDED".equals(status)) {
                 discount.setStatus(PaymentStatus.COMPLETED);
+                discount.setPaymentStatus("paid"); // Override to use "paid" instead of "SUCCEEDED"
             } else if ("FAILED".equals(status)) {
                 discount.setStatus(PaymentStatus.FAILED);
             }
@@ -86,6 +87,7 @@ public class PolymersDiscountsService {
                 discount.setStatus(PaymentStatus.COMPLETED);
             } else if ("SUCCEEDED".equals(status)) {
                 discount.setStatus(PaymentStatus.COMPLETED);
+                discount.setPaymentStatus("paid"); // Override to use "paid" instead of "SUCCEEDED"
             } else if ("FAILED".equals(status)) {
                 discount.setStatus(PaymentStatus.FAILED);
             }
@@ -352,7 +354,7 @@ public class PolymersDiscountsService {
                     if (discount != null) {
                         log.info("✅ [PolymersDiscountsService][WEBHOOK] Found existing discount record with ID: {}, current status: {}", discount.getId(), discount.getStatus());
                         discount.setStatus(PaymentStatus.COMPLETED);
-                        discount.setPaymentStatus("COMPLETED");
+                        discount.setPaymentStatus("paid");
                         if (session.getPaymentIntent() != null) {
                             discount.setPaymentIntentId(session.getPaymentIntent());
                             log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated paymentIntentId to: {}", session.getPaymentIntent());
@@ -437,7 +439,7 @@ public class PolymersDiscountsService {
                         PolymersDiscounts discount = discountOpt.get();
                         log.info("✅ [PolymersDiscountsService][WEBHOOK] Found existing discount record with ID: {}, current status: {}", discount.getId(), discount.getStatus());
                         discount.setStatus(PaymentStatus.COMPLETED);
-                        discount.setPaymentStatus("SUCCEEDED");
+                        discount.setPaymentStatus("paid");
                         discount.setUpdatedAt(java.time.LocalDateTime.now());
                         discountsRepository.save(discount);
                         log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated PolymersDiscounts status to COMPLETED for payment intent: {}", paymentIntentId);
@@ -449,7 +451,7 @@ public class PolymersDiscountsService {
                         if (matchingDiscount != null) {
                             log.info("✅ [PolymersDiscountsService][WEBHOOK] Using manually found discount record with ID: {}", matchingDiscount.getId());
                             matchingDiscount.setStatus(PaymentStatus.COMPLETED);
-                            matchingDiscount.setPaymentStatus("SUCCEEDED");
+                            matchingDiscount.setPaymentStatus("paid");
                             matchingDiscount.setPaymentIntentId(paymentIntentId); // Update the paymentIntentId
                             matchingDiscount.setUpdatedAt(java.time.LocalDateTime.now());
                             discountsRepository.save(matchingDiscount);
@@ -535,7 +537,7 @@ public class PolymersDiscountsService {
                 if (discount != null) {
                     log.info("✅ [PolymersDiscountsService][WEBHOOK] Found existing discount record with manual extraction - ID: {}, current status: {}", discount.getId(), discount.getStatus());
                     discount.setStatus(PaymentStatus.COMPLETED);
-                    discount.setPaymentStatus("COMPLETED");
+                    discount.setPaymentStatus("paid");
                     if (paymentIntent != null && !paymentIntent.isEmpty()) {
                         discount.setPaymentIntentId(paymentIntent);
                         log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated paymentIntentId to: {}", paymentIntent);
@@ -610,7 +612,7 @@ public class PolymersDiscountsService {
                     PolymersDiscounts discount = discountOpt.get();
                     log.info("✅ [PolymersDiscountsService][WEBHOOK] Found existing discount record with manual extraction - ID: {}, current status: {}", discount.getId(), discount.getStatus());
                     discount.setStatus(PaymentStatus.COMPLETED);
-                    discount.setPaymentStatus("SUCCEEDED");
+                    discount.setPaymentStatus("paid");
                     discount.setUpdatedAt(java.time.LocalDateTime.now());
                     discountsRepository.save(discount);
                     log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated PolymersDiscounts status to COMPLETED for payment intent (manual): {}", paymentIntentId);
@@ -621,7 +623,7 @@ public class PolymersDiscountsService {
                         if (paymentIntentId.equals(discount.getPaymentIntentId())) {
                             log.info("✅ [PolymersDiscountsService][WEBHOOK] Found matching discount via manual search - ID: {}", discount.getId());
                             discount.setStatus(PaymentStatus.COMPLETED);
-                            discount.setPaymentStatus("SUCCEEDED");
+                            discount.setPaymentStatus("paid");
                             discount.setUpdatedAt(java.time.LocalDateTime.now());
                             discountsRepository.save(discount);
                             log.info("✅ [PolymersDiscountsService][WEBHOOK] Updated PolymersDiscounts status to COMPLETED via manual search");

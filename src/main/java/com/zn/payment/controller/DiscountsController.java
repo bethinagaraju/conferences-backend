@@ -185,7 +185,7 @@ public class DiscountsController {
                         java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                         if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                             com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                            if (polymersDiscountsService.updatePaymentStatusBySessionId(session.getId(), "COMPLETED")) {
+                            if (polymersDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid")) {
                                 log.info("✅ [PolymersDiscountsService] Additional direct update completed for sessionId: {}", session.getId());
                             }
                         }
@@ -193,7 +193,7 @@ public class DiscountsController {
                         java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                         if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                             com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                            if (polymersDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "SUCCEEDED")) {
+                            if (polymersDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "paid")) {
                                 log.info("✅ [PolymersDiscountsService] Additional direct update completed for paymentIntentId: {}", paymentIntent.getId());
                             }
                         }
@@ -230,7 +230,7 @@ public class DiscountsController {
                             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                                 com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                if (opticsDiscountsService.updatePaymentStatusBySessionId(session.getId(), "COMPLETED")) {
+                                if (opticsDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid")) {
                                     log.info("✅ [OpticsDiscountsService] Additional direct update completed for sessionId: {}", session.getId());
                                 }
                             }
@@ -238,7 +238,7 @@ public class DiscountsController {
                             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                                 com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                                if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "SUCCEEDED")) {
+                                if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "paid")) {
                                     log.info("✅ [OpticsDiscountsService] Additional direct update completed for paymentIntentId: {}", paymentIntent.getId());
                                 }
                             }
@@ -262,7 +262,7 @@ public class DiscountsController {
                             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                                 com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                if (nursingDiscountsService.updatePaymentStatusBySessionId(session.getId(), "COMPLETED")) {
+                                if (nursingDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid")) {
                                     log.info("✅ [NursingDiscountsService] Additional direct update completed for sessionId: {}", session.getId());
                                 }
                             }
@@ -270,7 +270,7 @@ public class DiscountsController {
                             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                                 com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                                if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "SUCCEEDED")) {
+                                if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "paid")) {
                                     log.info("✅ [NursingDiscountsService] Additional direct update completed for paymentIntentId: {}", paymentIntent.getId());
                                 }
                             }
@@ -294,7 +294,7 @@ public class DiscountsController {
                             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                                 com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                if (renewableDiscountsService.updatePaymentStatusBySessionId(session.getId(), "COMPLETED")) {
+                                if (renewableDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid")) {
                                     log.info("✅ [RenewableDiscountsService] Additional direct update completed for sessionId: {}", session.getId());
                                 }
                             }
@@ -302,7 +302,7 @@ public class DiscountsController {
                             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
                                 com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                                if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "SUCCEEDED")) {
+                                if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "paid")) {
                                     log.info("✅ [RenewableDiscountsService] Additional direct update completed for paymentIntentId: {}", paymentIntent.getId());
                                 }
                             }
@@ -327,7 +327,7 @@ public class DiscountsController {
                             java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                             if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                                 com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                opticsDiscountsService.updatePaymentStatusBySessionId(session.getId(), "COMPLETED");
+                                opticsDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid");
                             }
                         }
                         
@@ -342,7 +342,7 @@ public class DiscountsController {
                                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                                 if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                                     com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                    nursingDiscountsService.updatePaymentStatusBySessionId(session.getId(), "COMPLETED");
+                                    nursingDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid");
                                 }
                             }
                             
@@ -357,7 +357,7 @@ public class DiscountsController {
                                     java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                                     if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                                         com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                        renewableDiscountsService.updatePaymentStatusBySessionId(session.getId(), "COMPLETED");
+                                        renewableDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid");
                                     }
                                 }
                                 
@@ -372,7 +372,7 @@ public class DiscountsController {
                                         java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                                         if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
                                             com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                            polymersDiscountsService.updatePaymentStatusBySessionId(session.getId(), "COMPLETED");
+                                            polymersDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid");
                                         }
                                     }
                                     
