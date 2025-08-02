@@ -69,6 +69,7 @@ public class RenewableDiscountsService {
             Map<String, String> metadata = new HashMap<>();
             metadata.put("source", "discount-api");
             metadata.put("paymentType", "discount-registration");
+            metadata.put("productName", request.getProductName());
             metadata.put("customerName", request.getName());
             metadata.put("customerEmail", request.getCustomerEmail());
             if (request.getPhone() != null) {
@@ -91,7 +92,8 @@ public class RenewableDiscountsService {
                                     .setUnitAmount(unitAmountCents)
                                     .setProductData(
                                         SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                            .setName(request.getName())
+                                            .setName(request.getProductName())
+                                            .setDescription(request.getDescription())
                                             .build()
                                     )
                                     .build()

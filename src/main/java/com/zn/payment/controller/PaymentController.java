@@ -508,6 +508,23 @@ public class PaymentController {
         }
     }
     
+    @PostMapping("/webhook/polymers")
+    public ResponseEntity<String> handlePolymersWebhook(HttpServletRequest request) throws IOException {
+        log.info("Received Polymers-specific webhook request");
+        
+        String payload = readPayload(request);
+        String sigHeader = request.getHeader("Stripe-Signature");
+        
+        try {
+            Event event = polymersStripeService.constructWebhookEvent(payload, sigHeader);
+            polymersStripeService.processWebhookEvent(event);
+            return ResponseEntity.ok().body("Polymers webhook processed successfully");
+        } catch (Exception e) {
+            log.error("❌ Error processing Polymers webhook: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Polymers webhook processing failed");
+        }
+    }
+    
     /**
      * Helper method to read the request payload
      */
