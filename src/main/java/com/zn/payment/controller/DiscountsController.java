@@ -127,6 +127,7 @@ public class DiscountsController {
             String paymentType = null;
             String productName = null;
             
+            // First try reflection-based extraction
             try {
                 java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                 if (stripeObjectOpt.isPresent()) {
@@ -143,7 +144,6 @@ public class DiscountsController {
                                 source = metadata.get("source");
                                 paymentType = metadata.get("paymentType");
                                 productName = metadata.get("productName");
-                                log.info("📋 [Discount Webhook] Extracted metadata - source: {}, paymentType: {}, productName: {}", source, paymentType, productName);
                             }
                         }
                     } catch (Exception ex) {
@@ -152,6 +152,32 @@ public class DiscountsController {
                 }
             } catch (Exception ex) {
                 log.warn("Could not extract metadata from event: {}", ex.getMessage());
+            }
+
+            // If reflection failed, try JSON parsing as fallback
+            if (productName == null && paymentType == null && source == null) {
+                try {
+                    String eventJson = event.toJson();
+                    com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    com.fasterxml.jackson.databind.JsonNode root = objectMapper.readTree(eventJson);
+                    com.fasterxml.jackson.databind.JsonNode metadataNode = root.path("data").path("object").path("metadata");
+                    if (metadataNode != null && !metadataNode.isMissingNode()) {
+                        if (metadataNode.has("productName")) {
+                            productName = metadataNode.get("productName").asText();
+                        }
+                        if (metadataNode.has("paymentType")) {
+                            paymentType = metadataNode.get("paymentType").asText();
+                        }
+                        if (metadataNode.has("source")) {
+                            source = metadataNode.get("source").asText();
+                        }
+                        log.info("📋 [Discount Webhook] JSON fallback extraction successful - source: {}, paymentType: {}, productName: {}", source, paymentType, productName);
+                    }
+                } catch (Exception ex) {
+                    log.warn("JSON parsing for metadata also failed: {}", ex.getMessage());
+                }
+            } else {
+                log.info("📋 [Discount Webhook] Reflection extraction successful - source: {}, paymentType: {}, productName: {}", source, paymentType, productName);
             }
 
             // Process the webhook event
