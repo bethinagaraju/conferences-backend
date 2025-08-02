@@ -274,6 +274,13 @@ public class PaymentController {
         String sigHeader = request.getHeader("Stripe-Signature");
         log.info("Webhook payload length: {}, Signature header present: {}", payload.length(), sigHeader != null);
 
+        // EARLY DISCOUNT DETECTION: Check raw payload for discount metadata before any processing
+        if (payload != null && (payload.contains("\"source\":\"discount-api\"") || payload.contains("\"paymentType\":\"discount-registration\""))) {
+            log.info("🛑 [EARLY DISCOUNT DETECTION] This webhook contains discount payment metadata. Returning 200 OK without processing in PaymentController.");
+            log.info("🛑 [EARLY DISCOUNT DETECTION] Discount webhooks should be handled by /api/discounts/webhook endpoint.");
+            return ResponseEntity.ok("Discount payment webhook ignored in PaymentController - should be handled by DiscountsController");
+        }
+
         if (sigHeader == null || sigHeader.isEmpty()) {
             log.error("⚠️ Missing Stripe-Signature header");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Missing signature header");
@@ -328,10 +335,13 @@ public class PaymentController {
                     log.warn("[Webhook Debug] Could not extract productName/paymentType/source from event: {}", ex.getMessage());
                 }
 
+                // Debug the extracted metadata values
+                log.info("[Webhook Debug] Extracted metadata - productName: {}, paymentType: {}, source: {}", productName, paymentType, source);
+
                 // If paymentType is discount-registration or source is discount-api, DO NOT process in this webhook (handled by /api/discounts/webhook)
                 if ((paymentType != null && paymentType.equalsIgnoreCase("discount-registration")) ||
                     (source != null && source.equalsIgnoreCase("discount-api"))) {
-                    log.info("[Webhook Debug] Skipping discount payment (paymentType=discount-registration or source=discount-api) in /api/payment/webhook. Only /api/discounts/webhook should process discount payments.");
+                    log.info("[Webhook Debug] Skipping discount payment (paymentType={} or source={}) in /api/payment/webhook. Only /api/discounts/webhook should process discount payments.", paymentType, source);
                     return ResponseEntity.ok("Discount payment ignored in payment webhook");
                 }
 

@@ -94,41 +94,93 @@ public class DiscountsController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Missing signature header");
         }
         try {
-            // Prioritize polymers for event construction if domain matches
+            // Try to construct event using polymers service first since it's most likely to be polymers
             Event event = null;
             String origin = request.getHeader("Origin");
             String referer = request.getHeader("Referer");
-            boolean isPolymersDomain = (origin != null && origin.contains("polyscienceconference.com")) ||
-                                       (referer != null && referer.contains("polyscienceconference.com"));
-            if (isPolymersDomain) {
-                try {
-                    event = polymersDiscountsService.constructWebhookEvent(payload, sigHeader);
-                } catch (Exception e) {
-                    log.warn("Polymers constructWebhookEvent failed: {}. Falling back to other services.", e.getMessage());
-                }
+            
+            // First, try polymers (most common for discount webhooks)
+            try {
+                event = polymersDiscountsService.constructWebhookEvent(payload, sigHeader);
+                log.info("✅ Webhook event successfully constructed using PolymersDiscountsService");
+            } catch (Exception e) {
+                log.warn("Polymers constructWebhookEvent failed: {}. Trying other services.", e.getMessage());
             }
+            
+            // If polymers failed, try other services
             if (event == null) {
                 try {
                     event = opticsDiscountsService.constructWebhookEvent(payload, sigHeader);
+                    log.info("✅ Webhook event successfully constructed using OpticsDiscountsService");
                 } catch (Exception e) {
                     try {
                         event = nursingDiscountsService.constructWebhookEvent(payload, sigHeader);
+                        log.info("✅ Webhook event successfully constructed using NursingDiscountsService");
                     } catch (Exception e2) {
                         event = renewableDiscountsService.constructWebhookEvent(payload, sigHeader);
+                        log.info("✅ Webhook event successfully constructed using RenewableDiscountsService");
                     }
                 }
             }
+            
             if (event == null) {
-                log.error("Failed to parse webhook event");
+                log.error("❌ Failed to parse webhook event with any service");
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Failed to parse event");
             }
-            // Directly update only the relevant discount table based on event type
+
+            // Extract metadata to determine which service to use for processing
+            String source = null;
+            String paymentType = null;
+            String productName = null;
+            
+            try {
+                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                if (stripeObjectOpt.isPresent()) {
+                    com.stripe.model.StripeObject stripeObject = stripeObjectOpt.get();
+                    java.util.Map<String, String> metadata = null;
+                    try {
+                        java.lang.reflect.Method getMetadata = stripeObject.getClass().getMethod("getMetadata");
+                        Object metaObj = getMetadata.invoke(stripeObject);
+                        if (metaObj instanceof java.util.Map) {
+                            metadata = (java.util.Map<String, String>) metaObj;
+                            if (metadata != null) {
+                                source = metadata.get("source");
+                                paymentType = metadata.get("paymentType");
+                                productName = metadata.get("productName");
+                                log.info("📋 [Discount Webhook] Extracted metadata - source: {}, paymentType: {}, productName: {}", source, paymentType, productName);
+                            }
+                        }
+                    } catch (Exception ex) {
+                        log.warn("Could not extract metadata from stripe object: {}", ex.getMessage());
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Could not extract metadata from event: {}", ex.getMessage());
+            }
+
+            // Process the webhook event
             String eventType = event.getType();
-            log.info("Processing discount webhook event: {}", eventType);
+            log.info("🎯 Processing discount webhook event: {}", eventType);
             boolean updated = false;
             String sessionId = null;
             String paymentIntentId = null;
-            if (isPolymersDomain) {
+
+            // Determine which service to use based on metadata and try polymers first
+            boolean usePolymers = true; // Default to polymers for discount webhooks
+            
+            if (productName != null) {
+                String productUpper = productName.toUpperCase();
+                if (productUpper.contains("OPTICS")) {
+                    usePolymers = false;
+                } else if (productUpper.contains("NURSING")) {
+                    usePolymers = false;
+                } else if (productUpper.contains("RENEWABLE")) {
+                    usePolymers = false;
+                }
+            }
+            
+            // Try polymers first (most discount webhooks are polymers)
+            if (usePolymers) {
                 // Always try polymers first for status update
                 if ("checkout.session.completed".equals(eventType)) {
                     java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
@@ -170,11 +222,12 @@ public class DiscountsController {
                         }
                     }
                 } else {
+                    log.info("[Polymers] Unhandled event type: {}. Marking as processed.", eventType);
                     updated = true; // Consider unhandled events as processed
                 }
-            }
-            // If not polymers domain, fallback to original logic
-            if (!isPolymersDomain) {
+            } else {
+                // Use other services if not polymers based on productName metadata
+                log.info("🔄 Using non-polymers services for discount webhook processing");
                 if ("checkout.session.completed".equals(eventType)) {
                     java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
                     if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
