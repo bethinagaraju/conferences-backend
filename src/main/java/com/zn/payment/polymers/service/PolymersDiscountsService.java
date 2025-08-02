@@ -33,14 +33,30 @@ import lombok.extern.slf4j.Slf4j;
 public class PolymersDiscountsService {
     /**
      * Update payment status in PolymersDiscounts by Stripe session ID
+     * Following same pattern as payment webhook processing
      */
     public boolean updatePaymentStatusBySessionId(String sessionId, String status) {
         log.info("[PolymersDiscountsService][WEBHOOK] Attempting to update payment status for sessionId: {} to {}", sessionId, status);
         PolymersDiscounts discount = discountsRepository.findBySessionId(sessionId);
         if (discount != null) {
-            log.info("[PolymersDiscountsService][WEBHOOK] Found discount for sessionId: {}", sessionId);
-            log.info("[PolymersDiscountsService][WEBHOOK] Updating paymentStatus to: {}", status);
+            log.info("[PolymersDiscountsService][WEBHOOK] Found discount record ID: {} for sessionId: {}", discount.getId(), sessionId);
+            log.info("[PolymersDiscountsService][WEBHOOK] Current status: {}, updating paymentStatus to: {}", discount.getStatus(), status);
+            
+            // Update payment status
             discount.setPaymentStatus(status);
+            
+            // Update main status based on payment status - same logic as payment webhook
+            if ("COMPLETED".equals(status) || "paid".equals(status)) {
+                discount.setStatus(PaymentStatus.COMPLETED);
+            } else if ("FAILED".equals(status) || "SUCCEEDED".equals(status)) {
+                discount.setStatus(PaymentStatus.COMPLETED);
+            } else if ("FAILED".equals(status)) {
+                discount.setStatus(PaymentStatus.FAILED);
+            }
+            
+            // Update timestamp
+            discount.setUpdatedAt(java.time.LocalDateTime.now());
+            
             discountsRepository.save(discount);
             log.info("[PolymersDiscountsService][WEBHOOK] Discount updated and saved for sessionId: {}", sessionId);
             return true;
@@ -52,15 +68,31 @@ public class PolymersDiscountsService {
 
     /**
      * Update payment status in PolymersDiscounts by Stripe payment intent ID
+     * Following same pattern as payment webhook processing
      */
     public boolean updatePaymentStatusByPaymentIntentId(String paymentIntentId, String status) {
         log.info("[PolymersDiscountsService][WEBHOOK] Attempting to update payment status for paymentIntentId: {} to {}", paymentIntentId, status);
         java.util.Optional<PolymersDiscounts> discountOpt = discountsRepository.findByPaymentIntentId(paymentIntentId);
         if (discountOpt.isPresent()) {
             PolymersDiscounts discount = discountOpt.get();
-            log.info("[PolymersDiscountsService][WEBHOOK] Found discount for paymentIntentId: {}", paymentIntentId);
-            log.info("[PolymersDiscountsService][WEBHOOK] Updating paymentStatus to: {}", status);
+            log.info("[PolymersDiscountsService][WEBHOOK] Found discount record ID: {} for paymentIntentId: {}", discount.getId(), paymentIntentId);
+            log.info("[PolymersDiscountsService][WEBHOOK] Current status: {}, updating paymentStatus to: {}", discount.getStatus(), status);
+            
+            // Update payment status
             discount.setPaymentStatus(status);
+            
+            // Update main status based on payment status - same logic as payment webhook
+            if ("COMPLETED".equals(status) || "paid".equals(status)) {
+                discount.setStatus(PaymentStatus.COMPLETED);
+            } else if ("SUCCEEDED".equals(status)) {
+                discount.setStatus(PaymentStatus.COMPLETED);
+            } else if ("FAILED".equals(status)) {
+                discount.setStatus(PaymentStatus.FAILED);
+            }
+            
+            // Update timestamp
+            discount.setUpdatedAt(java.time.LocalDateTime.now());
+            
             discountsRepository.save(discount);
             log.info("[PolymersDiscountsService][WEBHOOK] Discount updated and saved for paymentIntentId: {}", paymentIntentId);
             return true;
