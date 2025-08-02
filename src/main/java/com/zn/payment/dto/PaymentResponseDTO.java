@@ -129,4 +129,30 @@ public class PaymentResponseDTO {
         }
         return builder.build();
     }
+
+    /**
+     * Convert PolymersPaymentRecord entity to DTO
+     */
+    public static PaymentResponseDTO fromEntity(com.zn.payment.polymers.entity.PolymersPaymentRecord record) {
+        PaymentResponseDTOBuilder builder = PaymentResponseDTO.builder()
+            .id(record.getId())
+            .sessionId(record.getSessionId())
+            .paymentIntentId(record.getPaymentIntentId())
+            .customerEmail(record.getCustomerEmail())
+            .amountTotalEuros(record.getAmountTotal())
+            .amountTotalCents(record.getAmountTotal() != null ?
+                record.getAmountTotal().multiply(BigDecimal.valueOf(100)).longValue() : null)
+            .currency(record.getCurrency())
+            .status(PaymentStatus.valueOf(record.getStatus().name()))
+            .paymentStatus(record.getPaymentStatus())
+            .stripeCreatedAt(record.getStripeCreatedAt())
+            .stripeExpiresAt(record.getStripeExpiresAt())
+            .createdAt(record.getCreatedAt())
+            .updatedAt(record.getUpdatedAt());
+        if (record.getPricingConfig() != null) {
+            builder.pricingConfigId(record.getPricingConfig().getId())
+                   .pricingConfigTotalPrice(record.getPricingConfig().getTotalPrice());
+        }
+        return builder.build();
+    }
 }

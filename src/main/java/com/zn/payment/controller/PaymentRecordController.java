@@ -50,6 +50,10 @@ public class PaymentRecordController {
     // Add NursingPaymentRecordService for nursing vertical
     @Autowired
     private NursingPaymentRecordService nursingPaymentRecordService;
+    
+    // Add PolymersPaymentRecordService for polymers vertical
+    @Autowired
+    private com.zn.payment.polymers.service.PolymersPaymentRecordService polymersPaymentRecordService;
 
 
 
@@ -152,6 +156,34 @@ public class PaymentRecordController {
             ));
         }
     }
+
+    // Get payment record by session ID for Polymers
+    @GetMapping("/session/polymers/{sessionId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getPolymersPaymentBySessionId(@PathVariable String sessionId) {
+        String adminUser = getCurrentAdminUser();
+        logger.info("ADMIN {}: Retrieving payment record for session: {} for polymers", adminUser, sessionId);
+        try {
+            Optional<com.zn.payment.polymers.entity.PolymersPaymentRecord> payment = polymersPaymentRecordService.findBySessionId(sessionId);
+            if (payment.isPresent()) {
+                return ResponseEntity.ok(PaymentResponseDTO.fromEntity(payment.get()));
+            } else {
+                return ResponseEntity.ok().body(Map.of(
+                    "message", "Payment record not found",
+                    "sessionId", sessionId,
+                    "website", "polymers",
+                    "found", false
+                ));
+            }
+        } catch (Exception e) {
+            logger.error("ADMIN {}: Error retrieving payment for session {} for polymers: {}", adminUser, sessionId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "error", "Error retrieving payment record",
+                "message", e.getMessage(),
+                "website", "polymers"
+            ));
+        }
+    }
         // Get payment record by ID for Optics
     @GetMapping("/optics/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -235,6 +267,34 @@ public class PaymentRecordController {
             ));
         }
     }
+
+    // Get payment record by ID for Polymers
+    @GetMapping("/polymers/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getPolymersPaymentById(@PathVariable Long id) {
+        String adminUser = getCurrentAdminUser();
+        logger.info("ADMIN {}: Retrieving polymers payment record by ID: {}", adminUser, id);
+        try {
+            Optional<com.zn.payment.polymers.entity.PolymersPaymentRecord> payment = polymersPaymentRecordService.findById(id);
+            if (payment.isPresent()) {
+                return ResponseEntity.ok(PaymentResponseDTO.fromEntity(payment.get()));
+            } else {
+                return ResponseEntity.ok().body(Map.of(
+                    "message", "Polymers payment record not found",
+                    "id", id,
+                    "website", "polymers",
+                    "found", false
+                ));
+            }
+        } catch (Exception e) {
+            logger.error("ADMIN {}: Error retrieving polymers payment by ID {}: {}", adminUser, id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "error", "Error retrieving polymers payment record",
+                "message", e.getMessage(),
+                "website", "polymers"
+            ));
+        }
+    }
     // Get payment records by customer email for Optics
     @GetMapping("/customer/optics/{email}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -289,6 +349,24 @@ public class PaymentRecordController {
         }
     }
 
+    // Get payment records by customer email for Polymers
+    @GetMapping("/customer/polymers/{email}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<PaymentResponseDTO>> getPolymersPaymentsByCustomer(@PathVariable String email) {
+        String adminUser = getCurrentAdminUser();
+        logger.info("ADMIN {}: Retrieving payment records for customer: {} for polymers", adminUser, email);
+        try {
+            List<com.zn.payment.polymers.entity.PolymersPaymentRecord> polymersPayments = polymersPaymentRecordService.findByCustomerEmail(email);
+            List<PaymentResponseDTO> response = new java.util.ArrayList<>();
+            polymersPayments.forEach(p -> response.add(PaymentResponseDTO.fromEntity(p)));
+            logger.info("ADMIN {}: Found {} payment records for customer: {} for polymers", adminUser, response.size(), email);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("ADMIN {}: Error retrieving payments for customer {} for polymers: {}", adminUser, email, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     // Get payment records by status for Optics
     @GetMapping("/status/optics/{status}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -339,6 +417,24 @@ public class PaymentRecordController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("ADMIN {}: Error retrieving payments by status {} for nursing: {}", adminUser, status, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // Get payment records by status for Polymers
+    @GetMapping("/status/polymers/{status}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<PaymentResponseDTO>> getPolymersPaymentsByStatus(@PathVariable com.zn.payment.polymers.entity.PolymersPaymentRecord.PaymentStatus status) {
+        String adminUser = getCurrentAdminUser();
+        logger.info("ADMIN {}: Retrieving payment records with status: {} for polymers", adminUser, status);
+        try {
+            List<com.zn.payment.polymers.entity.PolymersPaymentRecord> polymersPayments = polymersPaymentRecordService.findByStatus(status);
+            List<PaymentResponseDTO> response = new java.util.ArrayList<>();
+            polymersPayments.forEach(p -> response.add(PaymentResponseDTO.fromEntity(p)));
+            logger.info("ADMIN {}: Found {} payment records with status: {} for polymers", adminUser, response.size(), status);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("ADMIN {}: Error retrieving payments by status {} for polymers: {}", adminUser, status, e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -405,6 +501,26 @@ public class PaymentRecordController {
     }
 
     /**
+     * Get all expired payment records for Polymers - ADMIN ONLY
+     */
+    @GetMapping("/expired/polymers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<PaymentResponseDTO>> getExpiredPolymersPayments() {
+        String adminUser = getCurrentAdminUser();
+        logger.info("ADMIN {}: Retrieving expired payment records for polymers", adminUser);
+        try {
+            List<com.zn.payment.polymers.entity.PolymersPaymentRecord> polymersPayments = polymersPaymentRecordService.findExpiredRecords();
+            List<PaymentResponseDTO> response = new java.util.ArrayList<>();
+            polymersPayments.forEach(p -> response.add(PaymentResponseDTO.fromEntity(p)));
+            logger.info("ADMIN {}: Found {} expired payment records for polymers", adminUser, response.size());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("ADMIN {}: Error retrieving expired payments for polymers: {}", adminUser, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
      * Mark expired records as EXPIRED - ADMIN ONLY
      */
     @GetMapping("/expire-stale")
@@ -415,8 +531,9 @@ public class PaymentRecordController {
             int opticsCount = opticsPaymentRecordService.markExpiredRecords();
             int renewableCount = renewablePaymentRecordService.markExpiredRecords();
             int nursingCount = nursingPaymentRecordService.markExpiredRecords();
-            int total = opticsCount + renewableCount + nursingCount;
-            String message = "ADMIN: Marked " + total + " payment records as expired (Optics: " + opticsCount + ", Renewable: " + renewableCount + ", Nursing: " + nursingCount + ")";
+            int polymersCount = polymersPaymentRecordService.markExpiredRecords();
+            int total = opticsCount + renewableCount + nursingCount + polymersCount;
+            String message = "ADMIN: Marked " + total + " payment records as expired (Optics: " + opticsCount + ", Renewable: " + renewableCount + ", Nursing: " + nursingCount + ", Polymers: " + polymersCount + ")";
             logger.info(message);
             return ResponseEntity.ok(message);
         } catch (Exception e) {
@@ -437,10 +554,12 @@ public class PaymentRecordController {
             var opticsStats = opticsPaymentRecordService.getPaymentStatistics();
             var renewableStats = renewablePaymentRecordService.getPaymentStatistics();
             var nursingStats = nursingPaymentRecordService.getPaymentStatistics();
+            var polymersStats = polymersPaymentRecordService.getPaymentStatistics();
             Map<String, Object> totalStats = Map.of(
                 "optics", opticsStats,
                 "renewable", renewableStats,
-                "nursing", nursingStats
+                "nursing", nursingStats,
+                "polymers", polymersStats
             );
             logger.info("ADMIN: Retrieved payment statistics successfully");
             return ResponseEntity.ok(totalStats);
@@ -472,10 +591,12 @@ public class PaymentRecordController {
             var opticsStats = opticsPaymentRecordService.getPaymentStatistics();
             var renewableStats = renewablePaymentRecordService.getPaymentStatistics();
             var nursingStats = nursingPaymentRecordService.getPaymentStatistics();
+            var polymersStats = polymersPaymentRecordService.getPaymentStatistics();
             Map<String, Object> totalStats = Map.of(
                 "optics", opticsStats,
                 "renewable", renewableStats,
-                "nursing", nursingStats
+                "nursing", nursingStats,
+                "polymers", polymersStats
             );
             logger.info("ADMIN: Retrieved enhanced payment statistics successfully");
             return ResponseEntity.ok(totalStats);
@@ -563,6 +684,26 @@ public class PaymentRecordController {
         }
     }
 
+    // Get all payment records for Polymers
+    @GetMapping("/all/polymers")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<PaymentResponseDTO>> getAllPolymersPayments() {
+        String adminUser = getCurrentAdminUser();
+        logger.info("ADMIN {}: Retrieving all payment records for polymers", adminUser);
+        try {
+            List<com.zn.payment.polymers.entity.PolymersPaymentRecord> payments = polymersPaymentRecordService.findAllPayments();
+            List<PaymentResponseDTO> response = new java.util.ArrayList<>();
+            for (com.zn.payment.polymers.entity.PolymersPaymentRecord payment : payments) {
+                response.add(PaymentResponseDTO.fromEntity(payment));
+            }
+            logger.info("ADMIN {}: Retrieved {} total payment records for polymers", adminUser, response.size());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("ADMIN {}: Error retrieving all payments for polymers: {}", adminUser, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     /**
      * Get recent payment records (last 24 hours) - ADMIN ONLY
      * Perfect for dashboard recent activity widget
@@ -583,6 +724,9 @@ public class PaymentRecordController {
             // Nursing
             List<com.zn.payment.nursing.entity.NursingPaymentRecord> nursingPayments = nursingPaymentRecordService.findRecentPayments();
             nursingPayments.forEach(p -> response.add(PaymentResponseDTO.fromEntity(p)));
+            // Polymers
+            List<com.zn.payment.polymers.entity.PolymersPaymentRecord> polymersPayments = polymersPaymentRecordService.findRecentPayments();
+            polymersPayments.forEach(p -> response.add(PaymentResponseDTO.fromEntity(p)));
             logger.info("ADMIN {}: Retrieved {} recent payment records", adminUser, response.size());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -650,6 +794,22 @@ public class PaymentRecordController {
                 );
                 response.add(paymentWithRegistration);
             }
+            // Polymers
+            List<com.zn.payment.polymers.entity.PolymersPaymentRecord> polymersPayments = polymersPaymentRecordService.findByStatus(com.zn.payment.polymers.entity.PolymersPaymentRecord.PaymentStatus.COMPLETED);
+            for (com.zn.payment.polymers.entity.PolymersPaymentRecord payment : polymersPayments) {
+                Map<String, Object> paymentWithRegistration = Map.of(
+                    "paymentId", payment.getId(),
+                    "sessionId", payment.getSessionId(),
+                    "customerEmail", payment.getCustomerEmail(),
+                    "amountTotal", payment.getAmountTotal(),
+                    "currency", payment.getCurrency(),
+                    "paymentStatus", payment.getPaymentStatus(),
+                    "createdAt", payment.getCreatedAt(),
+                    "hasRegistration", payment.getRegistrationForm() != null,
+                    "registrationId", payment.getRegistrationForm() != null ? payment.getRegistrationForm().getId() : null
+                );
+                response.add(paymentWithRegistration);
+            }
             logger.info("ADMIN {}: Retrieved {} completed payments with registration status", adminUser, response.size());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -671,7 +831,7 @@ public class PaymentRecordController {
         String adminUser = getCurrentAdminUser();
         logger.info("ADMIN {}: Retrieving payment record by ID: {}", adminUser, id);
         try {
-            // Try to find by ID in all three services
+            // Try to find by ID in all four services
             Optional<OpticsPaymentRecord> opticsPayment = opticsPaymentRecordService.findById(id);
             if (opticsPayment.isPresent()) {
                 PaymentResponseDTO response = PaymentResponseDTO.fromEntity(opticsPayment.get());
@@ -688,6 +848,12 @@ public class PaymentRecordController {
             if (nursingPayment.isPresent()) {
                 PaymentResponseDTO response = PaymentResponseDTO.fromEntity(nursingPayment.get());
                 logger.info("ADMIN {}: Found nursing payment record ID: {}", adminUser, id);
+                return ResponseEntity.ok(response);
+            }
+            Optional<com.zn.payment.polymers.entity.PolymersPaymentRecord> polymersPayment = polymersPaymentRecordService.findById(id);
+            if (polymersPayment.isPresent()) {
+                PaymentResponseDTO response = PaymentResponseDTO.fromEntity(polymersPayment.get());
+                logger.info("ADMIN {}: Found polymers payment record ID: {}", adminUser, id);
                 return ResponseEntity.ok(response);
             }
             logger.warn("ADMIN {}: Payment record not found for ID: {}", adminUser, id);
