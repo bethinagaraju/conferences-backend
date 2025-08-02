@@ -99,6 +99,13 @@ public class PolymersDiscountsService {
             discount.setAmountTotal(request.getUnitAmount()); // Save original euro amount for dashboard
             discount.setCurrency(request.getCurrency());
             discount.setCustomerEmail(request.getCustomerEmail());
+            discount.setName(request.getName()); // Set customer name
+            
+            // Set additional fields if available
+            if (request.getProductName() != null) {
+                // You might want to store productName in a field if your entity supports it
+                // For now, we'll include it in metadata
+            }
 
             // Create metadata to identify this as a discount session
             Map<String, String> metadata = new HashMap<>();
@@ -106,6 +113,15 @@ public class PolymersDiscountsService {
             metadata.put("paymentType", "discount-registration");
             metadata.put("customerName", request.getName());
             metadata.put("customerEmail", request.getCustomerEmail());
+            if (request.getProductName() != null) {
+                metadata.put("productName", request.getProductName());
+            }
+            if (request.getOrderReference() != null) {
+                metadata.put("orderReference", request.getOrderReference());
+            }
+            if (request.getDescription() != null) {
+                metadata.put("description", request.getDescription());
+            }
             if (request.getPhone() != null) {
                 metadata.put("customerPhone", request.getPhone());
             }
@@ -126,7 +142,8 @@ public class PolymersDiscountsService {
                                     .setUnitAmount(unitAmountCents)
                                     .setProductData(
                                         SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                            .setName(request.getName())
+                                            .setName(request.getProductName() != null ? request.getProductName() : request.getName())
+                                            .setDescription(request.getDescription() != null ? request.getDescription() : "Polymer Summit 2026 Discount Registration")
                                             .build()
                                     )
                                     .build()

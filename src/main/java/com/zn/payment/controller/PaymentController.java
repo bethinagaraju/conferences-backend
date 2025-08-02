@@ -275,8 +275,15 @@ public class PaymentController {
         log.info("Webhook payload length: {}, Signature header present: {}", payload.length(), sigHeader != null);
 
         // EARLY DISCOUNT DETECTION: Check raw payload for discount metadata before any processing
-        if (payload != null && (payload.contains("\"source\":\"discount-api\"") || payload.contains("\"paymentType\":\"discount-registration\""))) {
+        if (payload != null && (
+            payload.contains("\"source\":\"discount-api\"") || 
+            payload.contains("\"paymentType\":\"discount-registration\"") ||
+            payload.contains("\"productName\":\"POLYMER SUMMIT 2026 DISCOUNT REGISTRATION\"") ||
+            payload.contains("POLYMER SUMMIT 2026 DISCOUNT REQUEST") ||
+            payload.contains("DISCOUNT-") // orderReference pattern
+        )) {
             log.info("🛑 [EARLY DISCOUNT DETECTION] This webhook contains discount payment metadata. Returning 200 OK without processing in PaymentController.");
+            log.info("🛑 [EARLY DISCOUNT DETECTION] Detected patterns: source=discount-api, paymentType=discount-registration, or Polymer Summit discount product");
             log.info("🛑 [EARLY DISCOUNT DETECTION] Discount webhooks should be handled by /api/discounts/webhook endpoint.");
             return ResponseEntity.ok("Discount payment webhook ignored in PaymentController - should be handled by DiscountsController");
         }
