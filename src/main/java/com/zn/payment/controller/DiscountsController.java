@@ -159,23 +159,123 @@ public class DiscountsController {
             log.info("🎯 Processing discount webhook event: {}", eventType);
             boolean updated = false;
 
-            // Determine which service to use based on metadata and try polymers first
-            boolean usePolymers = true; // Default to polymers for discount webhooks
+            // Determine which service to use based on metadata - route explicitly
+            String serviceToUse = "polymers"; // Default to polymers for discount webhooks
             
             if (productName != null) {
                 String productUpper = productName.toUpperCase();
                 if (productUpper.contains("OPTICS")) {
-                    usePolymers = false;
+                    serviceToUse = "optics";
                 } else if (productUpper.contains("NURSING")) {
-                    usePolymers = false;
+                    serviceToUse = "nursing";
                 } else if (productUpper.contains("RENEWABLE")) {
-                    usePolymers = false;
+                    serviceToUse = "renewable";
                 }
             }
             
-            // Try polymers first (most discount webhooks are polymers)
-            if (usePolymers) {
-                // Use the comprehensive processWebhookEvent method in PolymersDiscountsService
+            log.info("🎯 Routing discount webhook to {} service based on productName: {}", serviceToUse, productName);
+            
+            // Route to appropriate service
+            if ("optics".equals(serviceToUse)) {
+                // Use OpticsDiscountsService
+                try {
+                    opticsDiscountsService.processWebhookEvent(event);
+                    log.info("✅ [OpticsDiscountsService] Successfully processed discount webhook event: {}", eventType);
+                    
+                    // Additional direct update logic based on event type
+                    if ("checkout.session.completed".equals(eventType)) {
+                        java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                        if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
+                            com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
+                            if (opticsDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid")) {
+                                log.info("✅ [OpticsDiscountsService] Additional direct update completed for sessionId: {}", session.getId());
+                            }
+                        }
+                    } else if ("payment_intent.succeeded".equals(eventType)) {
+                        java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                        if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                            com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                            if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "paid")) {
+                                log.info("✅ [OpticsDiscountsService] Additional direct update completed for paymentIntentId: {}", paymentIntent.getId());
+                            }
+                        }
+                    } else if ("payment_intent.payment_failed".equals(eventType)) {
+                        java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                        if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                            com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                            if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "FAILED")) {
+                                log.info("✅ [OpticsDiscountsService] Additional direct update completed for paymentIntentId: {}", paymentIntent.getId());
+                            }
+                        }
+                    }
+                    
+                    updated = true;
+                } catch (Exception e) {
+                    log.warn("⚠️ [OpticsDiscountsService] Failed to process webhook event {}: {}", eventType, e.getMessage());
+                    // Continue to try other services as fallback
+                }
+            } else if ("nursing".equals(serviceToUse)) {
+                // Use NursingDiscountsService
+                try {
+                    nursingDiscountsService.processWebhookEvent(event);
+                    log.info("✅ [NursingDiscountsService] Successfully processed discount webhook event: {}", eventType);
+                    
+                    // Additional direct update logic
+                    if ("checkout.session.completed".equals(eventType)) {
+                        java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                        if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
+                            com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
+                            if (nursingDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid")) {
+                                log.info("✅ [NursingDiscountsService] Additional direct update completed for sessionId: {}", session.getId());
+                            }
+                        }
+                    } else if ("payment_intent.succeeded".equals(eventType)) {
+                        java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                        if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                            com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                            if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "paid")) {
+                                log.info("✅ [NursingDiscountsService] Additional direct update completed for paymentIntentId: {}", paymentIntent.getId());
+                            }
+                        }
+                    }
+                    
+                    updated = true;
+                } catch (Exception e) {
+                    log.warn("⚠️ [NursingDiscountsService] Failed to process webhook event {}: {}", eventType, e.getMessage());
+                    // Continue to try other services as fallback
+                }
+            } else if ("renewable".equals(serviceToUse)) {
+                // Use RenewableDiscountsService
+                try {
+                    renewableDiscountsService.processWebhookEvent(event);
+                    log.info("✅ [RenewableDiscountsService] Successfully processed discount webhook event: {}", eventType);
+                    
+                    // Additional direct update logic
+                    if ("checkout.session.completed".equals(eventType)) {
+                        java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                        if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
+                            com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
+                            if (renewableDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid")) {
+                                log.info("✅ [RenewableDiscountsService] Additional direct update completed for sessionId: {}", session.getId());
+                            }
+                        }
+                    } else if ("payment_intent.succeeded".equals(eventType)) {
+                        java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
+                        if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
+                            com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
+                            if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "paid")) {
+                                log.info("✅ [RenewableDiscountsService] Additional direct update completed for paymentIntentId: {}", paymentIntent.getId());
+                            }
+                        }
+                    }
+                    
+                    updated = true;
+                } catch (Exception e) {
+                    log.warn("⚠️ [RenewableDiscountsService] Failed to process webhook event {}: {}", eventType, e.getMessage());
+                    // Continue to try other services as fallback
+                }
+            } else {
+                // Default to polymers (most discount webhooks are polymers)
                 try {
                     polymersDiscountsService.processWebhookEvent(event);
                     log.info("✅ [PolymersDiscountsService] Successfully processed discount webhook event: {}", eventType);
@@ -212,179 +312,38 @@ public class DiscountsController {
                     log.warn("⚠️ [PolymersDiscountsService] Failed to process webhook event {}: {}", eventType, e.getMessage());
                     // If polymers service fails, this might not be a polymers discount, continue to other services
                 }
-            } else {
-                // Use other services if not polymers based on productName metadata
-                log.info("🔄 Using non-polymers services for discount webhook processing");
-                
-                // Try to process with each service using their comprehensive processWebhookEvent methods
-                boolean processed = false;
-                
-                // Try Optics first
-                if (!processed && productName != null && productName.toUpperCase().contains("OPTICS")) {
-                    try {
-                        opticsDiscountsService.processWebhookEvent(event);
-                        log.info("✅ [OpticsDiscountsService] Successfully processed discount webhook event: {}", eventType);
-                        
-                        // Additional direct update logic - same pattern as payment webhook
-                        if ("checkout.session.completed".equals(eventType)) {
-                            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
-                                com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                if (opticsDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid")) {
-                                    log.info("✅ [OpticsDiscountsService] Additional direct update completed for sessionId: {}", session.getId());
-                                }
-                            }
-                        } else if ("payment_intent.succeeded".equals(eventType)) {
-                            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
-                                com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                                if (opticsDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "paid")) {
-                                    log.info("✅ [OpticsDiscountsService] Additional direct update completed for paymentIntentId: {}", paymentIntent.getId());
-                                }
-                            }
-                        }
-                        
-                        processed = true;
-                        updated = true;
-                    } catch (Exception e) {
-                        log.warn("⚠️ [OpticsDiscountsService] Failed to process webhook event {}: {}", eventType, e.getMessage());
-                    }
-                }
-                
-                // Try Nursing if not processed
-                if (!processed && productName != null && productName.toUpperCase().contains("NURSING")) {
+            }
+            
+            // If the primary service failed, try fallback services
+            if (!updated) {
+                log.info("🔄 Primary service failed, trying all services as fallback for discount webhook processing");
+                try {
+                    opticsDiscountsService.processWebhookEvent(event);
+                    log.info("✅ [OpticsDiscountsService] Successfully processed discount webhook as fallback: {}", eventType);
+                    updated = true;
+                } catch (Exception e) {
                     try {
                         nursingDiscountsService.processWebhookEvent(event);
-                        log.info("✅ [NursingDiscountsService] Successfully processed discount webhook event: {}", eventType);
-                        
-                        // Additional direct update logic - same pattern as payment webhook
-                        if ("checkout.session.completed".equals(eventType)) {
-                            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
-                                com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                if (nursingDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid")) {
-                                    log.info("✅ [NursingDiscountsService] Additional direct update completed for sessionId: {}", session.getId());
-                                }
-                            }
-                        } else if ("payment_intent.succeeded".equals(eventType)) {
-                            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
-                                com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                                if (nursingDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "paid")) {
-                                    log.info("✅ [NursingDiscountsService] Additional direct update completed for paymentIntentId: {}", paymentIntent.getId());
-                                }
-                            }
-                        }
-                        
-                        processed = true;
+                        log.info("✅ [NursingDiscountsService] Successfully processed discount webhook as fallback: {}", eventType);
                         updated = true;
-                    } catch (Exception e) {
-                        log.warn("⚠️ [NursingDiscountsService] Failed to process webhook event {}: {}", eventType, e.getMessage());
-                    }
-                }
-                
-                // Try Renewable if not processed
-                if (!processed && productName != null && productName.toUpperCase().contains("RENEWABLE")) {
-                    try {
-                        renewableDiscountsService.processWebhookEvent(event);
-                        log.info("✅ [RenewableDiscountsService] Successfully processed discount webhook event: {}", eventType);
-                        
-                        // Additional direct update logic - same pattern as payment webhook
-                        if ("checkout.session.completed".equals(eventType)) {
-                            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
-                                com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                if (renewableDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid")) {
-                                    log.info("✅ [RenewableDiscountsService] Additional direct update completed for sessionId: {}", session.getId());
-                                }
-                            }
-                        } else if ("payment_intent.succeeded".equals(eventType)) {
-                            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.PaymentIntent) {
-                                com.stripe.model.PaymentIntent paymentIntent = (com.stripe.model.PaymentIntent) stripeObjectOpt.get();
-                                if (renewableDiscountsService.updatePaymentStatusByPaymentIntentId(paymentIntent.getId(), "paid")) {
-                                    log.info("✅ [RenewableDiscountsService] Additional direct update completed for paymentIntentId: {}", paymentIntent.getId());
-                                }
-                            }
-                        }
-                        
-                        processed = true;
-                        updated = true;
-                    } catch (Exception e) {
-                        log.warn("⚠️ [RenewableDiscountsService] Failed to process webhook event {}: {}", eventType, e.getMessage());
-                    }
-                }
-                
-                // If still not processed, try all services as fallback
-                if (!processed) {
-                    log.info("🔄 Trying all services as fallback for discount webhook processing");
-                    try {
-                        opticsDiscountsService.processWebhookEvent(event);
-                        log.info("✅ [OpticsDiscountsService] Successfully processed discount webhook as fallback: {}", eventType);
-                        
-                        // Try direct update as well
-                        if ("checkout.session.completed".equals(eventType)) {
-                            java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                            if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
-                                com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                opticsDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid");
-                            }
-                        }
-                        
-                        updated = true;
-                    } catch (Exception e) {
+                    } catch (Exception e2) {
                         try {
-                            nursingDiscountsService.processWebhookEvent(event);
-                            log.info("✅ [NursingDiscountsService] Successfully processed discount webhook as fallback: {}", eventType);
-                            
-                            // Try direct update as well
-                            if ("checkout.session.completed".equals(eventType)) {
-                                java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                                if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
-                                    com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                    nursingDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid");
-                                }
-                            }
-                            
+                            renewableDiscountsService.processWebhookEvent(event);
+                            log.info("✅ [RenewableDiscountsService] Successfully processed discount webhook as fallback: {}", eventType);
                             updated = true;
-                        } catch (Exception e2) {
+                        } catch (Exception e3) {
                             try {
-                                renewableDiscountsService.processWebhookEvent(event);
-                                log.info("✅ [RenewableDiscountsService] Successfully processed discount webhook as fallback: {}", eventType);
-                                
-                                // Try direct update as well
-                                if ("checkout.session.completed".equals(eventType)) {
-                                    java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                                    if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
-                                        com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                        renewableDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid");
-                                    }
-                                }
-                                
+                                polymersDiscountsService.processWebhookEvent(event);
+                                log.info("✅ [PolymersDiscountsService] Successfully processed discount webhook as fallback: {}", eventType);
                                 updated = true;
-                            } catch (Exception e3) {
-                                try {
-                                    polymersDiscountsService.processWebhookEvent(event);
-                                    log.info("✅ [PolymersDiscountsService] Successfully processed discount webhook as fallback: {}", eventType);
-                                    
-                                    // Try direct update as well
-                                    if ("checkout.session.completed".equals(eventType)) {
-                                        java.util.Optional<com.stripe.model.StripeObject> stripeObjectOpt = event.getDataObjectDeserializer().getObject();
-                                        if (stripeObjectOpt.isPresent() && stripeObjectOpt.get() instanceof com.stripe.model.checkout.Session) {
-                                            com.stripe.model.checkout.Session session = (com.stripe.model.checkout.Session) stripeObjectOpt.get();
-                                            polymersDiscountsService.updatePaymentStatusBySessionId(session.getId(), "paid");
-                                        }
-                                    }
-                                    
-                                    updated = true;
-                                } catch (Exception e4) {
-                                    log.warn("⚠️ All discount services failed to process webhook event: {}", eventType);
-                                }
+                            } catch (Exception e4) {
+                                log.warn("⚠️ All discount services failed to process webhook event: {}", eventType);
                             }
                         }
                     }
                 }
             }
+            
             if (updated) {
                 log.info("✅ Discount webhook processed and discount table updated.");
                 return ResponseEntity.ok("Discount webhook processed and discount table updated");

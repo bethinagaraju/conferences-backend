@@ -279,11 +279,17 @@ public class PaymentController {
             payload.contains("\"source\":\"discount-api\"") || 
             payload.contains("\"paymentType\":\"discount-registration\"") ||
             payload.contains("\"productName\":\"POLYMER SUMMIT 2026 DISCOUNT REGISTRATION\"") ||
+            payload.contains("\"productName\":\"OPTICS 2026 DISCOUNT REGISTRATION\"") ||
+            payload.contains("\"productName\":\"NURSING") ||
+            payload.contains("\"productName\":\"RENEWABLE") ||
             payload.contains("POLYMER SUMMIT 2026 DISCOUNT REQUEST") ||
+            payload.contains("OPTICS 2026 DISCOUNT REQUEST") ||
+            payload.contains("NURSING") && payload.contains("DISCOUNT REQUEST") ||
+            payload.contains("RENEWABLE") && payload.contains("DISCOUNT REQUEST") ||
             payload.contains("DISCOUNT-") // orderReference pattern
         )) {
             log.info("🛑 [EARLY DISCOUNT DETECTION] This webhook contains discount payment metadata. Returning 200 OK without processing in PaymentController.");
-            log.info("🛑 [EARLY DISCOUNT DETECTION] Detected patterns: source=discount-api, paymentType=discount-registration, or Polymer Summit discount product");
+            log.info("🛑 [EARLY DISCOUNT DETECTION] Detected patterns: source=discount-api, paymentType=discount-registration, or discount product names");
             log.info("🛑 [EARLY DISCOUNT DETECTION] Discount webhooks should be handled by /api/discounts/webhook endpoint.");
             return ResponseEntity.ok("Discount payment webhook ignored in PaymentController - should be handled by DiscountsController");
         }
@@ -347,8 +353,13 @@ public class PaymentController {
 
                 // If paymentType is discount-registration or source is discount-api, DO NOT process in this webhook (handled by /api/discounts/webhook)
                 if ((paymentType != null && paymentType.equalsIgnoreCase("discount-registration")) ||
-                    (source != null && source.equalsIgnoreCase("discount-api"))) {
-                    log.info("[Webhook Debug] Skipping discount payment (paymentType={} or source={}) in /api/payment/webhook. Only /api/discounts/webhook should process discount payments.", paymentType, source);
+                    (source != null && source.equalsIgnoreCase("discount-api")) ||
+                    (productName != null && (
+                        productName.contains("DISCOUNT REGISTRATION") ||
+                        productName.contains("DISCOUNT REQUEST") ||
+                        productName.toLowerCase().contains("discount")
+                    ))) {
+                    log.info("[Webhook Debug] Skipping discount payment (paymentType={}, source={}, productName={}) in /api/payment/webhook. Only /api/discounts/webhook should process discount payments.", paymentType, source, productName);
                     return ResponseEntity.ok("Discount payment ignored in payment webhook");
                 }
 
