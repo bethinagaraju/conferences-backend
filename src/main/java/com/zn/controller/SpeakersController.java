@@ -74,10 +74,12 @@ public class SpeakersController {
         return opticsSpeakersService.getTopSpeakers();
     }
     // get top nursing speakers
+    @GetMapping("/nursing/top")
     public List<?> getTopNursingSpeakers() {
         return nursingSpeakersService.getTopSpeakers();
     }
     // get top renewable speakers
+    @GetMapping("/renewable/top")
     public List<?> getTopRenewableSpeakers() {
         return renewableSpeakersService.getTopSpeakers();
     }
