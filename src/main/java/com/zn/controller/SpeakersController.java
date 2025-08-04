@@ -7,12 +7,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,8 +26,11 @@ import com.zn.polymers.service.PolymersSpeakersService;
 import com.zn.renewable.entity.RenewableSpeakers;
 import com.zn.renewable.service.RenewableSpeakersService;
 
+import lombok.extern.slf4j.Slf4j;
+
 @RestController
 @RequestMapping("/api/speakers")
+@Slf4j
 public class SpeakersController {
     @Autowired
     private RenewableSpeakersService renewableSpeakersService;
@@ -98,10 +101,13 @@ public class SpeakersController {
             speaker.setType(speakerAddRequestDTO.getType());
 
             MultipartFile image = speakerAddRequestDTO.getImage();
+            log.info("Adding Renewable Speaker: name={}, university={}, type={}, bio={}, imagePresent={}",
+                speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
             byte[] imageBytes = (image != null) ? image.getBytes() : null;
             renewableSpeakersService.addSpeaker(speaker, imageBytes);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            log.error("Error adding Renewable Speaker: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
         }
     }
@@ -117,10 +123,13 @@ public class SpeakersController {
             speaker.setType(speakerAddRequestDTO.getType());
 
             MultipartFile image = speakerAddRequestDTO.getImage();
+            log.info("Adding Nursing Speaker: name={}, university={}, type={}, bio={}, imagePresent={}",
+                speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
             byte[] imageBytes = (image != null) ? image.getBytes() : null;
             nursingSpeakersService.addSpeaker(speaker, imageBytes);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            log.error("Error adding Nursing Speaker: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
         }
     }
@@ -135,10 +144,13 @@ public class SpeakersController {
             speaker.setType(speakerAddRequestDTO.getType());
 
             MultipartFile image = speakerAddRequestDTO.getImage();
+            log.info("Adding Optics Speaker: name={}, university={}, type={}, bio={}, imagePresent={}",
+                speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
             byte[] imageBytes = (image != null) ? image.getBytes() : null;
             opticsSpeakersService.addSpeaker(speaker, imageBytes);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            log.error("Error adding Optics Speaker: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
         }
     }
@@ -154,10 +166,13 @@ public class SpeakersController {
             speaker.setType(speakerAddRequestDTO.getType());
 
             MultipartFile image = speakerAddRequestDTO.getImage();
+            log.info("Adding Polymers Speaker: name={}, university={}, type={}, bio={}, imagePresent={}",
+                speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
             byte[] imageBytes = (image != null) ? image.getBytes() : null;
             polymersSpeakersService.addSpeaker(speaker, imageBytes);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
+            log.error("Error adding Polymers Speaker: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
         }
     }
