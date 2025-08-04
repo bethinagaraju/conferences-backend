@@ -48,25 +48,33 @@ public class SpeakersController {
    // get all renewable speakers
     @GetMapping("/renewable")
     public List<?> getRenewableSpeakers() {
-        return renewableSpeakersService.getAllSpeakers();
+        List<?> speakers = renewableSpeakersService.getAllSpeakers();
+        log.info("Fetched {} renewable speakers", speakers.size());
+        return speakers;
     }
 
     // get all nursing speakers
     @GetMapping("/nursing")
     public List<?> getNursingSpeakers() {
-        return nursingSpeakersService.getAllSpeakers();
+        List<?> speakers = nursingSpeakersService.getAllSpeakers();
+        log.info("Fetched {} nursing speakers", speakers.size());
+        return speakers;
     }
 
     // get all optics speakers
     @GetMapping("/optics")
     public List<?> getOpticsSpeakers() {
-        return opticsSpeakersService.getAllSpeakers();
+        List<?> speakers = opticsSpeakersService.getAllSpeakers();
+        log.info("Fetched {} optics speakers", speakers.size());
+        return speakers;
     }
 
     // get all polymers speakers
     @GetMapping("/polymers")
     public List<?> getPolymersSpeakers() {
-        return polymersSpeakersService.getAllSpeakers();
+        List<?> speakers = polymersSpeakersService.getAllSpeakers();
+        log.info("Fetched {} polymers speakers", speakers.size());
+        return speakers;
     }
 
     // get top polymers speakers
@@ -91,7 +99,7 @@ public class SpeakersController {
     }
     // while adding speakers first updload the image and then add the speaker url in the database
     @PostMapping(value = "renewable/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
-    @PreAuthorize("hasRole('ADMIN')")
+   @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addRenewableSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         try {
             RenewableSpeakers speaker = new RenewableSpeakers();
