@@ -98,7 +98,7 @@ public class SpeakersController {
         return renewableSpeakersService.getTopSpeakers();
     }
     // while adding speakers first updload the image and then add the speaker url in the database
-    @PostMapping(value = "renewable/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    @PostMapping(value = "renewable/add")
    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addRenewableSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         try {
@@ -120,7 +120,7 @@ public class SpeakersController {
         }
     }
 
-    @PostMapping(value = "nursing/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    @PostMapping(value = "nursing/add")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addNursingSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         try {
@@ -141,7 +141,7 @@ public class SpeakersController {
             return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
         }
     }
-    @PostMapping(value = "optics/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    @PostMapping(value = "optics/add")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addOpticsSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         try {
@@ -163,7 +163,7 @@ public class SpeakersController {
         }
     }
 
-    @PostMapping(value = "polymers/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    @PostMapping(value = "polymers/add")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addPolymersSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         try {
