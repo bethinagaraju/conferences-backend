@@ -124,8 +124,7 @@ public class SpeakersController {
             return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
         }
     }
-
-    @PostMapping(value = "optics/add")
+    @PostMapping(value = "optics/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addOpticsSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         try {
