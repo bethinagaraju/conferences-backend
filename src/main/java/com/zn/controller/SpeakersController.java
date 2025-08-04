@@ -99,7 +99,7 @@ public class SpeakersController {
         }
     }
 
-    @PostMapping(value = "nursing/add" ,  consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "nursing/add" )
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addNursingSpeaker(
         @RequestPart("speaker") NursingSpeakers speaker,
