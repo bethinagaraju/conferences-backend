@@ -22,7 +22,7 @@ public class NursingSpeakersService {
 
     @Value("${supabase.api.key}")
     private String SUPABASE_API_KEY;
-
+    
     public List<?> getAllSpeakers() {
         return nursingSpeakersRepository.findAll();
     }
