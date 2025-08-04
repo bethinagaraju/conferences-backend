@@ -26,32 +26,28 @@ public class RenewableSpeakersService {
     }
 
     // while adding speakers first upload the image and then add the speaker url in the database
+    @Autowired
+    private org.springframework.web.client.RestTemplate restTemplate;
+
     public void addSpeaker(RenewableSpeakers speaker, byte[] imageBytes) {
-        // 1. Upload image to Supabase bucket
         String imageUrl = null;
         try {
-            // Use speaker name as image filename, sanitized
             String imageName = speaker.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".jpg";
-            java.net.URL url = new java.net.URL(SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/renewablespeakers/" + imageName);
-            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Authorization", "Bearer " + SUPABASE_API_KEY);
-            conn.setRequestProperty("Content-Type", "application/octet-stream");
-            conn.setDoOutput(true);
-            try (java.io.OutputStream os = conn.getOutputStream()) {
-                os.write(imageBytes);
-            }
-            int responseCode = conn.getResponseCode();
-            if (responseCode == 200 || responseCode == 201) {
+            String uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/renewablespeakers/" + imageName;
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("Authorization", "Bearer " + SUPABASE_API_KEY);
+            headers.set("apikey", SUPABASE_API_KEY);
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
+            org.springframework.http.HttpEntity<byte[]> entity = new org.springframework.http.HttpEntity<>(imageBytes, headers);
+            org.springframework.http.ResponseEntity<String> response = restTemplate.exchange(uploadUrl, org.springframework.http.HttpMethod.PUT, entity, String.class);
+            if (response.getStatusCode().is2xxSuccessful()) {
                 imageUrl = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/renewablespeakers/" + imageName;
             } else {
-                throw new RuntimeException("Image upload failed: " + responseCode);
+                throw new RuntimeException("Image upload failed: " + response.getStatusCodeValue());
             }
         } catch (Exception e) {
             throw new RuntimeException("Image upload error: " + e.getMessage(), e);
         }
-
-        // 2. Set image URL in speaker and save
         speaker.setImageUrl(imageUrl);
         renewableSpeakersRepository.save(speaker);
     }
@@ -65,27 +61,23 @@ public class RenewableSpeakersService {
             String imageUrl = null;
             try {
                 String imageName = speaker.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".jpg";
-                java.net.URL url = new java.net.URL(SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/renewablespeakers/" + imageName);
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Authorization", "Bearer " + SUPABASE_API_KEY);
-                conn.setRequestProperty("Content-Type", "application/octet-stream");
-                conn.setDoOutput(true);
-                try (java.io.OutputStream os = conn.getOutputStream()) {
-                    os.write(imageBytes);
-                }
-                int responseCode = conn.getResponseCode();
-                if (responseCode == 200 || responseCode == 201) {
+                String uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/renewablespeakers/" + imageName;
+                org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+                headers.set("Authorization", "Bearer " + SUPABASE_API_KEY);
+                headers.set("apikey", SUPABASE_API_KEY);
+                headers.setContentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
+                org.springframework.http.HttpEntity<byte[]> entity = new org.springframework.http.HttpEntity<>(imageBytes, headers);
+                org.springframework.http.ResponseEntity<String> response = restTemplate.exchange(uploadUrl, org.springframework.http.HttpMethod.PUT, entity, String.class);
+                if (response.getStatusCode().is2xxSuccessful()) {
                     imageUrl = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/renewablespeakers/" + imageName;
                 } else {
-                    throw new RuntimeException("Image upload failed: " + responseCode);
+                    throw new RuntimeException("Image upload failed: " + response.getStatusCodeValue());
                 }
             } catch (Exception e) {
                 throw new RuntimeException("Image upload error: " + e.getMessage(), e);
             }
             speaker.setImageUrl(imageUrl);
         }
-        // If imageBytes is null or empty, keep the old imageUrl
         renewableSpeakersRepository.save(speaker);
     }
     // get top 8 renewable speakers

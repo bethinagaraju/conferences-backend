@@ -28,24 +28,24 @@ public class NursingSpeakersService {
     }
 
     // Save speaker with image upload to Supabase bucket
+    @Autowired
+    private org.springframework.web.client.RestTemplate restTemplate;
+
     public void addSpeaker(NursingSpeakers speaker, byte[] imageBytes) {
         String imageUrl = null;
         try {
             String imageName = speaker.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".jpg";
-            java.net.URL url = new java.net.URL(SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/nursingspeakers/" + imageName);
-            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Authorization", "Bearer " + SUPABASE_API_KEY);
-            conn.setRequestProperty("Content-Type", "application/octet-stream");
-            conn.setDoOutput(true);
-            try (java.io.OutputStream os = conn.getOutputStream()) {
-                os.write(imageBytes);
-            }
-            int responseCode = conn.getResponseCode();
-            if (responseCode == 200 || responseCode == 201) {
+            String uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/nursingspeakers/" + imageName;
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("Authorization", "Bearer " + SUPABASE_API_KEY);
+            headers.set("apikey", SUPABASE_API_KEY);
+            headers.setContentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
+            org.springframework.http.HttpEntity<byte[]> entity = new org.springframework.http.HttpEntity<>(imageBytes, headers);
+            org.springframework.http.ResponseEntity<String> response = restTemplate.exchange(uploadUrl, org.springframework.http.HttpMethod.PUT, entity, String.class);
+            if (response.getStatusCode().is2xxSuccessful()) {
                 imageUrl = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/nursingspeakers/" + imageName;
             } else {
-                throw new RuntimeException("Image upload failed: " + responseCode);
+                throw new RuntimeException("Image upload failed: " + response.getStatusCode().value());
             }
         } catch (Exception e) {
             throw new RuntimeException("Image upload error: " + e.getMessage(), e);
@@ -63,27 +63,23 @@ public class NursingSpeakersService {
             String imageUrl = null;
             try {
                 String imageName = speaker.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".jpg";
-                java.net.URL url = new java.net.URL(SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/nursingspeakers/" + imageName);
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
-                conn.setRequestProperty("Authorization", "Bearer " + SUPABASE_API_KEY);
-                conn.setRequestProperty("Content-Type", "application/octet-stream");
-                conn.setDoOutput(true);
-                try (java.io.OutputStream os = conn.getOutputStream()) {
-                    os.write(imageBytes);
-                }
-                int responseCode = conn.getResponseCode();
-                if (responseCode == 200 || responseCode == 201) {
+                String uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/nursingspeakers/" + imageName;
+                org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+                headers.set("Authorization", "Bearer " + SUPABASE_API_KEY);
+                headers.set("apikey", SUPABASE_API_KEY);
+                headers.setContentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
+                org.springframework.http.HttpEntity<byte[]> entity = new org.springframework.http.HttpEntity<>(imageBytes, headers);
+                org.springframework.http.ResponseEntity<String> response = restTemplate.exchange(uploadUrl, org.springframework.http.HttpMethod.PUT, entity, String.class);
+                if (response.getStatusCode().is2xxSuccessful()) {
                     imageUrl = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/nursingspeakers/" + imageName;
                 } else {
-                    throw new RuntimeException("Image upload failed: " + responseCode);
+                    throw new RuntimeException("Image upload failed: " + response.getStatusCode().value());
                 }
             } catch (Exception e) {
                 throw new RuntimeException("Image upload error: " + e.getMessage(), e);
             }
             speaker.setImageUrl(imageUrl);
         }
-        // If imageBytes is null or empty, keep the old imageUrl
         nursingSpeakersRepository.save(speaker);
     }
     // get top 8 nursing speakers
