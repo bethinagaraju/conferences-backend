@@ -85,7 +85,7 @@ public class SpeakersController {
         return renewableSpeakersService.getTopSpeakers();
     }
     // while adding speakers first updload the image and then add the speaker url in the database
-    @PostMapping(value = "renewable/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE })
+    @PostMapping(value = "renewable/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_OCTET_STREAM_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addRenewableSpeaker(
         @RequestPart(value = "speaker", required = false) RenewableSpeakers speaker,
@@ -102,7 +102,7 @@ public class SpeakersController {
         }
     }
 
-    @PostMapping(value = "nursing/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE })
+    @PostMapping(value = "nursing/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_OCTET_STREAM_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addNursingSpeaker(
         @RequestPart(value = "speaker", required = false) NursingSpeakers speaker,
@@ -119,7 +119,7 @@ public class SpeakersController {
         }
     }
 
-    @PostMapping(value = "optics/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE })
+    @PostMapping(value = "optics/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_OCTET_STREAM_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addOpticsSpeaker(
         @RequestPart(value = "speaker", required = false) OpticsSpeakers speaker,
@@ -136,7 +136,7 @@ public class SpeakersController {
         }
     }
 
-    @PostMapping(value = "polymers/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE })
+    @PostMapping(value = "polymers/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE, MediaType.APPLICATION_OCTET_STREAM_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addPolymersSpeaker(
         @RequestPart(value = "speaker", required = false) PolymersSpeakers speaker,
