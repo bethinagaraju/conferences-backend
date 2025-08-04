@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.zn.dto.SpeakerAddRequestDTO;
 import com.zn.nursing.entity.NursingSpeakers;
 import com.zn.nursing.service.NursingSpeakersService;
 import com.zn.optics.entity.OpticsSpeakers;
@@ -88,11 +89,15 @@ public class SpeakersController {
     // while adding speakers first updload the image and then add the speaker url in the database
     @PostMapping(value = "renewable/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> addRenewableSpeaker(
-        @ModelAttribute RenewableSpeakers speaker,
-        @RequestPart(value = "image", required = false) MultipartFile image
-    ) {
+    public ResponseEntity<?> addRenewableSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         try {
+            RenewableSpeakers speaker = new RenewableSpeakers();
+            speaker.setName(speakerAddRequestDTO.getName());
+            speaker.setBio(speakerAddRequestDTO.getBio());
+            speaker.setUniversity(speakerAddRequestDTO.getUniversity());
+            speaker.setType(speakerAddRequestDTO.getType());
+
+            MultipartFile image = speakerAddRequestDTO.getImage();
             byte[] imageBytes = (image != null) ? image.getBytes() : null;
             renewableSpeakersService.addSpeaker(speaker, imageBytes);
             return ResponseEntity.ok().build();
@@ -103,11 +108,15 @@ public class SpeakersController {
 
     @PostMapping(value = "nursing/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> addNursingSpeaker(
-        @ModelAttribute NursingSpeakers speaker,
-        @RequestPart(value = "image", required = false) MultipartFile image
-    ) {
+    public ResponseEntity<?> addNursingSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         try {
+            NursingSpeakers speaker = new NursingSpeakers();
+            speaker.setName(speakerAddRequestDTO.getName());
+            speaker.setBio(speakerAddRequestDTO.getBio());
+            speaker.setUniversity(speakerAddRequestDTO.getUniversity());
+            speaker.setType(speakerAddRequestDTO.getType());
+
+            MultipartFile image = speakerAddRequestDTO.getImage();
             byte[] imageBytes = (image != null) ? image.getBytes() : null;
             nursingSpeakersService.addSpeaker(speaker, imageBytes);
             return ResponseEntity.ok().build();
@@ -116,13 +125,17 @@ public class SpeakersController {
         }
     }
 
-    @PostMapping(value = "optics/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    @PostMapping(value = "optics/add")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> addOpticsSpeaker(
-        @ModelAttribute OpticsSpeakers speaker,
-        @RequestPart(value = "image", required = false) MultipartFile image
-    ) {
+    public ResponseEntity<?> addOpticsSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         try {
+            OpticsSpeakers speaker = new OpticsSpeakers();
+            speaker.setName(speakerAddRequestDTO.getName());
+            speaker.setBio(speakerAddRequestDTO.getBio());
+            speaker.setUniversity(speakerAddRequestDTO.getUniversity());
+            speaker.setType(speakerAddRequestDTO.getType());
+
+            MultipartFile image = speakerAddRequestDTO.getImage();
             byte[] imageBytes = (image != null) ? image.getBytes() : null;
             opticsSpeakersService.addSpeaker(speaker, imageBytes);
             return ResponseEntity.ok().build();
@@ -133,11 +146,15 @@ public class SpeakersController {
 
     @PostMapping(value = "polymers/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> addPolymersSpeaker(
-        @ModelAttribute PolymersSpeakers speaker,
-        @RequestPart(value = "image", required = false) MultipartFile image
-    ) {
+    public ResponseEntity<?> addPolymersSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         try {
+            PolymersSpeakers speaker = new PolymersSpeakers();
+            speaker.setName(speakerAddRequestDTO.getName());
+            speaker.setBio(speakerAddRequestDTO.getBio());
+            speaker.setUniversity(speakerAddRequestDTO.getUniversity());
+            speaker.setType(speakerAddRequestDTO.getType());
+
+            MultipartFile image = speakerAddRequestDTO.getImage();
             byte[] imageBytes = (image != null) ? image.getBytes() : null;
             polymersSpeakersService.addSpeaker(speaker, imageBytes);
             return ResponseEntity.ok().build();
