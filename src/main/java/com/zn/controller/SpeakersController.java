@@ -85,56 +85,68 @@ public class SpeakersController {
         return renewableSpeakersService.getTopSpeakers();
     }
     // while adding speakers first updload the image and then add the speaker url in the database
-    @PostMapping("renewable/add")
+    @PostMapping(value = "renewable/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addRenewableSpeaker(
-        @RequestPart("speaker") RenewableSpeakers speaker,
-        @RequestPart("image") MultipartFile image
+        @RequestPart(value = "speaker", required = false) RenewableSpeakers speaker,
+        @RequestPart(value = "image", required = false) MultipartFile image,
+        @RequestBody(required = false) RenewableSpeakers speakerBody
     ) {
         try {
-            renewableSpeakersService.addSpeaker(speaker, image.getBytes());
+            RenewableSpeakers actualSpeaker = speaker != null ? speaker : speakerBody;
+            byte[] imageBytes = (image != null) ? image.getBytes() : null;
+            renewableSpeakersService.addSpeaker(actualSpeaker, imageBytes);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
         }
     }
 
-    @PostMapping(value = "nursing/add" )
+    @PostMapping(value = "nursing/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addNursingSpeaker(
-        @RequestPart("speaker") NursingSpeakers speaker,
-        @RequestPart("image") MultipartFile image
+        @RequestPart(value = "speaker", required = false) NursingSpeakers speaker,
+        @RequestPart(value = "image", required = false) MultipartFile image,
+        @RequestBody(required = false) NursingSpeakers speakerBody
     ) {
         try {
-            nursingSpeakersService.addSpeaker(speaker, image.getBytes());
+            NursingSpeakers actualSpeaker = speaker != null ? speaker : speakerBody;
+            byte[] imageBytes = (image != null) ? image.getBytes() : null;
+            nursingSpeakersService.addSpeaker(actualSpeaker, imageBytes);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
         }
     }
 
-    @PostMapping("optics/add")
+    @PostMapping(value = "optics/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addOpticsSpeaker(
-        @RequestPart("speaker") OpticsSpeakers speaker,
-        @RequestPart("image") MultipartFile image
+        @RequestPart(value = "speaker", required = false) OpticsSpeakers speaker,
+        @RequestPart(value = "image", required = false) MultipartFile image,
+        @RequestBody(required = false) OpticsSpeakers speakerBody
     ) {
         try {
-            opticsSpeakersService.addSpeaker(speaker, image.getBytes());
+            OpticsSpeakers actualSpeaker = speaker != null ? speaker : speakerBody;
+            byte[] imageBytes = (image != null) ? image.getBytes() : null;
+            opticsSpeakersService.addSpeaker(actualSpeaker, imageBytes);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
         }
     }
 
-    @PostMapping("polymers/add")
+    @PostMapping(value = "polymers/add", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE, MediaType.APPLICATION_JSON_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addPolymersSpeaker(
-        @RequestPart("speaker") PolymersSpeakers speaker,
-        @RequestPart("image") MultipartFile image
+        @RequestPart(value = "speaker", required = false) PolymersSpeakers speaker,
+        @RequestPart(value = "image", required = false) MultipartFile image,
+        @RequestBody(required = false) PolymersSpeakers speakerBody
     ) {
         try {
-            polymersSpeakersService.addSpeaker(speaker, image.getBytes());
+            PolymersSpeakers actualSpeaker = speaker != null ? speaker : speakerBody;
+            byte[] imageBytes = (image != null) ? image.getBytes() : null;
+            polymersSpeakersService.addSpeaker(actualSpeaker, imageBytes);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
