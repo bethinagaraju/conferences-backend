@@ -186,7 +186,7 @@ public class SpeakersController {
     public ResponseEntity<?> addPolymersSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         log.info("[ENTRY] addPolymersSpeaker called with DTO: {}", speakerAddRequestDTO);
         try {
-            
+
             PolymersSpeakers speaker = new PolymersSpeakers();
             speaker.setName(speakerAddRequestDTO.getName());
             speaker.setBio(speakerAddRequestDTO.getBio());
@@ -200,7 +200,7 @@ public class SpeakersController {
                 log.info("[ADD] Polymers Speaker image details: name={}, size={}, contentType={}", image.getOriginalFilename(), image.getSize(), image.getContentType());
             }
             byte[] imageBytes = (image != null) ? image.getBytes() : null;
-            polymersSpeakersService.addSpeaker(speaker, imageBytes);
+            polymersSpeakersService.addSpeaker(speaker, speakerAddRequestDTO.getImage());
             log.info("[ADD] Polymers Speaker added successfully: name={}, university={}, type={}, bio={}",
                 speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio());
             return ResponseEntity.ok().build();
@@ -299,7 +299,7 @@ public class SpeakersController {
                 log.info("[EDIT] Polymers Speaker image details: name={}, size={}, contentType={}", image.getOriginalFilename(), image.getSize(), image.getContentType());
             }
             byte[] imageBytes = (image != null) ? image.getBytes() : null;
-            polymersSpeakersService.editSpeaker(speaker, imageBytes);
+            polymersSpeakersService.editSpeaker(speaker, image);
             log.info("[EDIT] Polymers Speaker edited successfully: id={}, name={}, university={}, type={}, bio={}",
                 speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio());
             return ResponseEntity.ok().build();
