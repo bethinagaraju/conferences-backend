@@ -1,8 +1,16 @@
 package com.zn.controller;
+import com.zn.dto.SpeakerAddRequestDTO;
+import com.zn.nursing.entity.NursingSpeakers;
+import com.zn.nursing.service.NursingSpeakersService;
+import com.zn.optics.entity.OpticsSpeakers;
+import com.zn.optics.service.OpticsSpeakersService;
+import com.zn.polymers.entity.PolymersSpeakers;
+import com.zn.polymers.service.PolymersSpeakersService;
+import com.zn.renewable.entity.RenewableSpeakers;
+import com.zn.renewable.service.RenewableSpeakersService;
 import java.util.List;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,18 +23,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
-import com.zn.dto.SpeakerAddRequestDTO;
-import com.zn.nursing.entity.NursingSpeakers;
-import com.zn.nursing.service.NursingSpeakersService;
-import com.zn.optics.entity.OpticsSpeakers;
-import com.zn.optics.service.OpticsSpeakersService;
-import com.zn.polymers.entity.PolymersSpeakers;
-import com.zn.polymers.service.PolymersSpeakersService;
-import com.zn.renewable.entity.RenewableSpeakers;
-import com.zn.renewable.service.RenewableSpeakersService;
-
-import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/speakers")
@@ -97,8 +93,8 @@ public class SpeakersController {
     public List<?> getTopRenewableSpeakers() {
         return renewableSpeakersService.getTopSpeakers();
     }
-    // while adding speakers first updload the image and then add the speaker url in the database
-    @PostMapping(value = "renewable/add")
+    // while adding speakers first upload the image and then add the speaker url in the database
+    @PostMapping("/renewable/add")
    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addRenewableSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         log.info("[ENTRY] addRenewableSpeaker called with DTO: {}", speakerAddRequestDTO);
@@ -126,7 +122,7 @@ public class SpeakersController {
         }
     }
 
-    @PostMapping(value = "nursing/add")
+    @PostMapping("/nursing/add")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addNursingSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         log.info("[ENTRY] addNursingSpeaker called with DTO: {}", speakerAddRequestDTO);
@@ -153,7 +149,7 @@ public class SpeakersController {
             return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
         }
     }
-    @PostMapping(value = "optics/add")
+    @PostMapping("/optics/add")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addOpticsSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         log.info("[ENTRY] addOpticsSpeaker called with DTO: {}", speakerAddRequestDTO);
