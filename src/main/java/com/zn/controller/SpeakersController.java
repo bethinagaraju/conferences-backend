@@ -186,6 +186,7 @@ public class SpeakersController {
     public ResponseEntity<?> addPolymersSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         log.info("[ENTRY] addPolymersSpeaker called with DTO: {}", speakerAddRequestDTO);
         try {
+            
             PolymersSpeakers speaker = new PolymersSpeakers();
             speaker.setName(speakerAddRequestDTO.getName());
             speaker.setBio(speakerAddRequestDTO.getBio());
@@ -214,10 +215,11 @@ public class SpeakersController {
     @PutMapping("/renewable/edit")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> editRenewableSpeaker(
-        log.info("[ENTRY] editRenewableSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
         @RequestPart("speaker") RenewableSpeakers speaker,
         @RequestPart(value = "image", required = false) MultipartFile image
     ) {
+
+        log.info("[ENTRY] editRenewableSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
         try {
             log.info("[EDIT] Renewable Speaker edit request: id={}, name={}, university={}, type={}, bio={}, imagePresent={}",
                 speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
@@ -238,10 +240,10 @@ public class SpeakersController {
     @PutMapping("/nursing/edit")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> editNursingSpeaker(
-        log.info("[ENTRY] editNursingSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
         @RequestPart("speaker") NursingSpeakers speaker,
         @RequestPart(value = "image", required = false) MultipartFile image
     ) {
+        log.info("[ENTRY] editNursingSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
         try {
             log.info("[EDIT] Nursing Speaker edit request: id={}, name={}, university={}, type={}, bio={}, imagePresent={}",
                 speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
@@ -262,10 +264,10 @@ public class SpeakersController {
     @PutMapping("/optics/edit")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> editOpticsSpeaker(
-        log.info("[ENTRY] editOpticsSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
         @RequestPart("speaker") OpticsSpeakers speaker,
         @RequestPart(value = "image", required = false) MultipartFile image
     ) {
+        log.info("[ENTRY] editOpticsSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
         try {
             log.info("[EDIT] Optics Speaker edit request: id={}, name={}, university={}, type={}, bio={}, imagePresent={}",
                 speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
@@ -286,10 +288,10 @@ public class SpeakersController {
     @PutMapping("/polymers/edit")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> editPolymersSpeaker(
-        log.info("[ENTRY] editPolymersSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
         @RequestPart("speaker") PolymersSpeakers speaker,
         @RequestPart(value = "image", required = false) MultipartFile image
     ) {
+        log.info("[ENTRY] editPolymersSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
         try {
             log.info("[EDIT] Polymers Speaker edit request: id={}, name={}, university={}, type={}, bio={}, imagePresent={}",
                 speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
