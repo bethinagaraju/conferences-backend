@@ -45,10 +45,10 @@ public class PolymersSpeakersService {
         polymersSpeakersRepository.delete(speaker);
     }
     // Enhanced: Optionally update image if imageBytes is provided
-    public void editSpeaker(PolymersSpeakers speaker, org.springframework.web.multipart.MultipartFile image) throws Exception {
-        if (image != null && !image.isEmpty()) {
+    public void editSpeaker(PolymersSpeakers speaker, byte[] imageBytes) throws Exception {
+        if (imageBytes != null && imageBytes.length > 0) {
             String imageName = speaker.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".jpg";
-            String publicUrl = storageClient.uploadFile("polymersspeakers/" + imageName, image.getInputStream(), image.getSize());
+            String publicUrl = storageClient.uploadFile("polymersspeakers/" + imageName, new java.io.ByteArrayInputStream(imageBytes), imageBytes.length);
             speaker.setImageUrl(publicUrl);
         }
         polymersSpeakersRepository.save(speaker);
