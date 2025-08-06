@@ -42,29 +42,62 @@ public class SpeakersController {
 
    
    // get all renewable speakers
-    @GetMapping("/renewable")
-    public List<?> getRenewableSpeakers() {
-        List<?> speakers = renewableSpeakersService.getAllSpeakers();
-        log.info("Fetched {} renewable speakers", speakers.size());
-        return speakers;
-    }
+    @PutMapping("/nursing/edit")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> editNursingSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
+        log.info("[ENTRY] editNursingSpeaker called with DTO: {}", speakerAddRequestDTO);
+        try {
+            NursingSpeakers speaker = new NursingSpeakers();
+            speaker.setId(speakerAddRequestDTO.getId());
+            speaker.setName(speakerAddRequestDTO.getName());
+            speaker.setBio(speakerAddRequestDTO.getBio());
+            speaker.setUniversity(speakerAddRequestDTO.getUniversity());
+            speaker.setType(speakerAddRequestDTO.getType());
 
-    // get all nursing speakers
-    @GetMapping("/nursing")
-    public List<?> getNursingSpeakers() {
-        List<?> speakers = nursingSpeakersService.getAllSpeakers();
-        log.info("Fetched {} nursing speakers", speakers.size());
-        return speakers;
+            MultipartFile image = speakerAddRequestDTO.getImage();
+            log.info("[EDIT] Nursing Speaker edit request: id={}, name={}, university={}, type={}, bio={}, imagePresent={}",
+                speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
+            if (image != null) {
+                log.info("[EDIT] Nursing Speaker image details: name={}, size={}, contentType={}", image.getOriginalFilename(), image.getSize(), image.getContentType());
+            }
+            byte[] imageBytes = (image != null) ? image.getBytes() : null;
+            nursingSpeakersService.editSpeaker(speaker, imageBytes);
+            log.info("[EDIT] Nursing Speaker edited successfully: id={}, name={}, university={}, type={}, bio={}",
+                speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("[EDIT] Error editing Nursing Speaker: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
+        }
     }
+    @PutMapping("/renewable/edit")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> editRenewableSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
+        log.info("[ENTRY] editRenewableSpeaker called with DTO: {}", speakerAddRequestDTO);
+        try {
+            RenewableSpeakers speaker = new RenewableSpeakers();
+            speaker.setId(speakerAddRequestDTO.getId());
+            speaker.setName(speakerAddRequestDTO.getName());
+            speaker.setBio(speakerAddRequestDTO.getBio());
+            speaker.setUniversity(speakerAddRequestDTO.getUniversity());
+            speaker.setType(speakerAddRequestDTO.getType());
 
-    // get all optics speakers
-    @GetMapping("/optics")
-    public List<?> getOpticsSpeakers() {
-        List<?> speakers = opticsSpeakersService.getAllSpeakers();
-        log.info("Fetched {} optics speakers", speakers.size());
-        return speakers;
+            MultipartFile image = speakerAddRequestDTO.getImage();
+            log.info("[EDIT] Renewable Speaker edit request: id={}, name={}, university={}, type={}, bio={}, imagePresent={}",
+                speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
+            if (image != null) {
+                log.info("[EDIT] Renewable Speaker image details: name={}, size={}, contentType={}", image.getOriginalFilename(), image.getSize(), image.getContentType());
+            }
+            byte[] imageBytes = (image != null) ? image.getBytes() : null;
+            renewableSpeakersService.editSpeaker(speaker, imageBytes);
+            log.info("[EDIT] Renewable Speaker edited successfully: id={}, name={}, university={}, type={}, bio={}",
+                speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio());
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("[EDIT] Error editing Renewable Speaker: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
+        }
     }
-
     // get all polymers speakers
     @GetMapping("/polymers")
     public List<?> getPolymersSpeakers() {
@@ -208,63 +241,21 @@ public class SpeakersController {
 
     // edit and delete methods can be added similarly
 
-    @PutMapping("/renewable/edit")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> editRenewableSpeaker(
-        @RequestPart("speaker") RenewableSpeakers speaker,
-        @RequestPart(value = "image", required = false) MultipartFile image
-    ) {
 
-        log.info("[ENTRY] editRenewableSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
-        try {
-            log.info("[EDIT] Renewable Speaker edit request: id={}, name={}, university={}, type={}, bio={}, imagePresent={}",
-                speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
-            if (image != null) {
-                log.info("[EDIT] Renewable Speaker image details: name={}, size={}, contentType={}", image.getOriginalFilename(), image.getSize(), image.getContentType());
-            }
-            byte[] imageBytes = (image != null) ? image.getBytes() : null;
-            renewableSpeakersService.editSpeaker(speaker, imageBytes);
-            log.info("[EDIT] Renewable Speaker edited successfully: id={}, name={}, university={}, type={}, bio={}",
-                speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio());
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            log.error("[EDIT] Error editing Renewable Speaker: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
-        }
-    }
-
-    @PutMapping("/nursing/edit")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> editNursingSpeaker(
-        @RequestPart("speaker") NursingSpeakers speaker,
-        @RequestPart(value = "image", required = false) MultipartFile image
-    ) {
-        log.info("[ENTRY] editNursingSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
-        try {
-            log.info("[EDIT] Nursing Speaker edit request: id={}, name={}, university={}, type={}, bio={}, imagePresent={}",
-                speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
-            if (image != null) {
-                log.info("[EDIT] Nursing Speaker image details: name={}, size={}, contentType={}", image.getOriginalFilename(), image.getSize(), image.getContentType());
-            }
-            byte[] imageBytes = (image != null) ? image.getBytes() : null;
-            nursingSpeakersService.editSpeaker(speaker, imageBytes);
-            log.info("[EDIT] Nursing Speaker edited successfully: id={}, name={}, university={}, type={}, bio={}",
-                speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio());
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            log.error("[EDIT] Error editing Nursing Speaker: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body("Image upload failed: " + e.getMessage());
-        }
-    }
 
     @PutMapping("/optics/edit")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> editOpticsSpeaker(
-        @RequestPart("speaker") OpticsSpeakers speaker,
-        @RequestPart(value = "image", required = false) MultipartFile image
-    ) {
-        log.info("[ENTRY] editOpticsSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
+    public ResponseEntity<?> editOpticsSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
+        log.info("[ENTRY] editOpticsSpeaker called with DTO: {}", speakerAddRequestDTO);
         try {
+            OpticsSpeakers speaker = new OpticsSpeakers();
+            speaker.setId(speakerAddRequestDTO.getId());
+            speaker.setName(speakerAddRequestDTO.getName());
+            speaker.setBio(speakerAddRequestDTO.getBio());
+            speaker.setUniversity(speakerAddRequestDTO.getUniversity());
+            speaker.setType(speakerAddRequestDTO.getType());
+
+            MultipartFile image = speakerAddRequestDTO.getImage();
             log.info("[EDIT] Optics Speaker edit request: id={}, name={}, university={}, type={}, bio={}, imagePresent={}",
                 speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
             if (image != null) {
@@ -283,19 +274,24 @@ public class SpeakersController {
 
     @PutMapping("/polymers/edit")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> editPolymersSpeaker(
-        @RequestPart("speaker") PolymersSpeakers speaker,
-        @RequestPart(value = "image", required = false) MultipartFile image
-    ) {
-        log.info("[ENTRY] editPolymersSpeaker called with entity: {} and image: {}", speaker, image != null ? image.getOriginalFilename() : null);
+    public ResponseEntity<?> editPolymersSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
+        log.info("[ENTRY] editPolymersSpeaker called with DTO: {}", speakerAddRequestDTO);
         try {
+            PolymersSpeakers speaker = new PolymersSpeakers();
+            speaker.setId(speakerAddRequestDTO.getId());
+            speaker.setName(speakerAddRequestDTO.getName());
+            speaker.setBio(speakerAddRequestDTO.getBio());
+            speaker.setUniversity(speakerAddRequestDTO.getUniversity());
+            speaker.setType(speakerAddRequestDTO.getType());
+
+            MultipartFile image = speakerAddRequestDTO.getImage();
             log.info("[EDIT] Polymers Speaker edit request: id={}, name={}, university={}, type={}, bio={}, imagePresent={}",
                 speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio(), (image != null));
             if (image != null) {
                 log.info("[EDIT] Polymers Speaker image details: name={}, size={}, contentType={}", image.getOriginalFilename(), image.getSize(), image.getContentType());
             }
             byte[] imageBytes = (image != null) ? image.getBytes() : null;
-            polymersSpeakersService.editSpeaker(speaker, image);
+            polymersSpeakersService.editSpeaker(speaker, imageBytes);
             log.info("[EDIT] Polymers Speaker edited successfully: id={}, name={}, university={}, type={}, bio={}",
                 speaker.getId(), speaker.getName(), speaker.getUniversity(), speaker.getType(), speaker.getBio());
             return ResponseEntity.ok().build();
