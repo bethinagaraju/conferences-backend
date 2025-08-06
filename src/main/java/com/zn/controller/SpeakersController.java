@@ -28,6 +28,32 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/speakers")
 @Slf4j
 public class SpeakersController {
+    // get all renewable speakers
+    @GetMapping("/renewable")
+    public List<?> getRenewableSpeakers() {
+        List<?> speakers = renewableSpeakersService.getAllSpeakers();
+        log.info("Fetched {} renewable speakers", speakers.size());
+        return speakers;
+    }
+
+    // get all nursing speakers
+    @GetMapping("/nursing")
+    public List<?> getNursingSpeakers() {
+        List<?> speakers = nursingSpeakersService.getAllSpeakers();
+        log.info("Fetched {} nursing speakers", speakers.size());
+        return speakers;
+    }
+
+    // get all optics speakers
+    @GetMapping("/optics")
+    public List<?> getOpticsSpeakers() {
+        List<?> speakers = opticsSpeakersService.getAllSpeakers();
+        log.info("Fetched {} optics speakers", speakers.size());
+        return speakers;
+    }
+
+    // get all polymers speakers
+ 
     @Autowired
     private RenewableSpeakersService renewableSpeakersService;
 
