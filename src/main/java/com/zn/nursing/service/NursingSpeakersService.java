@@ -1,13 +1,12 @@
 package com.zn.nursing.service;
 
+import com.zn.nursing.entity.NursingSpeakers;
+import com.zn.nursing.repository.INursingSpeakersRepository;
 import java.util.List;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
-import com.zn.nursing.entity.NursingSpeakers;
-import com.zn.nursing.repository.INursingSpeakersRepository;
+import org.springframework.web.client.RestTemplate;
 
 @Service
 public class NursingSpeakersService {
@@ -28,8 +27,8 @@ public class NursingSpeakersService {
     }
 
     // Save speaker with image upload to Supabase bucket
-    @Autowired
-    private org.springframework.web.client.RestTemplate restTemplate;
+
+   private final RestTemplate restTemplate = new RestTemplate();
 
     public void addSpeaker(NursingSpeakers speaker, byte[] imageBytes) {
         String imageUrl = null;
