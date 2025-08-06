@@ -59,6 +59,11 @@ public class RenewableSpeakersService {
     }
     // Enhanced: Optionally update image if imageBytes is provided
     public void editSpeaker(RenewableSpeakers speaker, byte[] imageBytes) {
+        RenewableSpeakers existing = renewableSpeakersRepository.findById(speaker.getId()).orElseThrow(() -> new RuntimeException("Speaker not found"));
+        existing.setName(speaker.getName());
+        existing.setBio(speaker.getBio());
+        existing.setUniversity(speaker.getUniversity());
+        existing.setType(speaker.getType());
         if (imageBytes != null && imageBytes.length > 0) {
             String imageUrl = null;
             try {
@@ -81,10 +86,9 @@ public class RenewableSpeakersService {
             } catch (Exception e) {
                 throw new RuntimeException("Image upload error: " + e.getMessage(), e);
             }
-            speaker.setImageUrl(imageUrl);
+            existing.setImageUrl(imageUrl);
         }
-        // If imageBytes is null or empty, keep the old imageUrl
-        renewableSpeakersRepository.save(speaker);
+        renewableSpeakersRepository.save(existing);
     }
     // get top 8 renewable speakers
     public List<?> getTopSpeakers() {

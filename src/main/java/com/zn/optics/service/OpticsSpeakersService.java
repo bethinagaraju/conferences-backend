@@ -59,6 +59,11 @@ public class OpticsSpeakersService {
     }
     // Enhanced: Optionally update image if imageBytes is provided
     public void editSpeaker(OpticsSpeakers speaker, byte[] imageBytes) {
+        OpticsSpeakers existing = opticsSpeakersRepository.findById(speaker.getId()).orElseThrow(() -> new RuntimeException("Speaker not found"));
+        existing.setName(speaker.getName());
+        existing.setBio(speaker.getBio());
+        existing.setUniversity(speaker.getUniversity());
+        existing.setType(speaker.getType());
         if (imageBytes != null && imageBytes.length > 0) {
             String imageUrl = null;
             try {
@@ -78,9 +83,9 @@ public class OpticsSpeakersService {
             } catch (Exception e) {
                 throw new RuntimeException("Image upload error: " + e.getMessage(), e);
             }
-            speaker.setImageUrl(imageUrl);
+            existing.setImageUrl(imageUrl);
         }
-        opticsSpeakersRepository.save(speaker);
+        opticsSpeakersRepository.save(existing);
     }
     // get top 8 optics speakers
     public List<?> getTopSpeakers() {

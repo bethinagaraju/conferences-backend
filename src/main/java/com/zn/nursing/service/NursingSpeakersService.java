@@ -58,6 +58,11 @@ public class NursingSpeakersService {
     }
     // Enhanced: Optionally update image if imageBytes is provided
     public void editSpeaker(NursingSpeakers speaker, byte[] imageBytes) {
+        NursingSpeakers existing = nursingSpeakersRepository.findById(speaker.getId()).orElseThrow(() -> new RuntimeException("Speaker not found"));
+        existing.setName(speaker.getName());
+        existing.setBio(speaker.getBio());
+        existing.setUniversity(speaker.getUniversity());
+        existing.setType(speaker.getType());
         if (imageBytes != null && imageBytes.length > 0) {
             String imageUrl = null;
             try {
@@ -77,9 +82,9 @@ public class NursingSpeakersService {
             } catch (Exception e) {
                 throw new RuntimeException("Image upload error: " + e.getMessage(), e);
             }
-            speaker.setImageUrl(imageUrl);
+            existing.setImageUrl(imageUrl);
         }
-        nursingSpeakersRepository.save(speaker);
+        nursingSpeakersRepository.save(existing);
     }
     // get top 8 nursing speakers
     public List<?> getTopSpeakers() {

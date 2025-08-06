@@ -44,12 +44,17 @@ public class PolymersSpeakersService {
     }
     // Enhanced: Optionally update image if imageBytes is provided
     public void editSpeaker(PolymersSpeakers speaker, byte[] imageBytes) throws Exception {
+        PolymersSpeakers existing = polymersSpeakersRepository.findById(speaker.getId()).orElseThrow(() -> new RuntimeException("Speaker not found"));
+        existing.setName(speaker.getName());
+        existing.setBio(speaker.getBio());
+        existing.setUniversity(speaker.getUniversity());
+        existing.setType(speaker.getType());
         if (imageBytes != null && imageBytes.length > 0) {
             String imageName = speaker.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".jpg";
             String publicUrl = storageClient.uploadFile("polymersspeakers/" + imageName, new java.io.ByteArrayInputStream(imageBytes), imageBytes.length);
-            speaker.setImageUrl(publicUrl);
+            existing.setImageUrl(publicUrl);
         }
-        polymersSpeakersRepository.save(speaker);
+        polymersSpeakersRepository.save(existing);
     }
 
     // get top 8 polymers speakers
