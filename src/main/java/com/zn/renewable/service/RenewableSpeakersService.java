@@ -70,7 +70,7 @@ public class RenewableSpeakersService {
                 String imageName = speaker.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".jpg";
                 java.net.URL url = new java.net.URL(SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/renewablespeakers/" + imageName);
                 java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
+                conn.setRequestMethod("PUT");
                 conn.setRequestProperty("Authorization", "Bearer " + SUPABASE_API_KEY);
                 conn.setRequestProperty("Content-Type", "application/octet-stream");
                 conn.setDoOutput(true);
