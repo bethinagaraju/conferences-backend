@@ -3,13 +3,6 @@
 
 package com.zn.adminservice;
 
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-
 import com.zn.adminentity.Admin;
 import com.zn.adminrepo.IAdminRepo;
 import com.zn.dto.AdminResponseDTO;
@@ -36,6 +29,10 @@ import com.zn.renewable.repository.IRenewableIntrestedInOptionsRepo;
 import com.zn.renewable.repository.IRenewablePricingConfigRepository;
 import com.zn.renewable.repository.IRenewableRegistrationFormRepository;
 import com.zn.renewable.repository.IRenewableSessionOption;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 @Service
 public class AdminService {
@@ -59,28 +56,35 @@ public class AdminService {
 	private IRenewableIntrestedInOptionsRepo renewableInterestedInOptionRepo;
 	@Autowired private INursingSessionOption nursingSessionOption;
 	@Autowired private INursingIntrestedInOptionsRepo nursingInterestedInOptionRepo;
+	// Polymers repositories
+	@Autowired private com.zn.polymers.repository.IPolymersSessionOption polymersSessionOption;
+	@Autowired private com.zn.polymers.repository.IPolymersInterestedInOptionsRepo polymersInterestedInOptionsRepo;
 	// Removed missing InterestedInOption repositories
 	@Autowired private IOpticsPricingConfigRepository opticsPricingConfigRepository;
 	@Autowired private IRenewablePricingConfigRepository renewablePricingConfigRepository;
 	@Autowired private INursingPricingConfigRepository nursingPricingConfigRepository;
+	@Autowired private com.zn.polymers.repository.IPolymersPricingConfigRepository polymersPricingConfigRepository;
 	@Autowired private IOpricsRegistrationFormRepository opticsRegistrationFormRepository;
 	@Autowired private IRenewableRegistrationFormRepository renewableRegistrationFormRepository;
 	@Autowired private INursingRegistrationFormRepository nursingRegistrationFormRepository;
+	@Autowired private com.zn.polymers.repository.IPolymersRegistrationFormRepository polymersRegistrationFormRepository;
 	@Autowired private IOpticsAccommodationRepo opticsAccommodationRepo;
 	@Autowired private IRenewableAccommodationRepo renewableAccommodationRepo;
 	@Autowired private INursingAccommodationRepo nursingAccommodationRepo;
+	@Autowired private com.zn.polymers.repository.IPolymersAccommodationRepo polymersAccommodationRepo;
 	@Autowired private IAdminRepo adminRepo;	
 	@Autowired private INursingFormSubmissionRepo nursingFormSubmissionRepo;
  @Autowired private IOpticsFormSubmissionRepo opticsFormSubmissionRepo;
  @Autowired private IRenewableFormSubmissionRepo renewableFormSubmissionRepo;
+ @Autowired private com.zn.polymers.repository.IPolymersFormSubmissionRepo polymersFormSubmissionRepo;
 	@Autowired
 	private com.zn.payment.nursing.repository.NursingDiscountsRepository nursingDiscountsRepository;
 	@Autowired
 	private com.zn.payment.optics.repository.OpticsDiscountsRepository opticsDiscountsRepository;
 @Autowired
 	private com.zn.payment.renewable.repository.RenewableDiscountsRepository renewableDiscountsRepository;
-
-	  private final RestTemplate restTemplate = new RestTemplate();
+@Autowired
+	private com.zn.payment.polymers.repository.PolymersDiscountsRepository polymersDiscountsRepository;
 
 	/**
 	 * Register a new admin with encrypted password
@@ -190,6 +194,15 @@ public class AdminService {
 		return "Session option inserted successfully (nursing).";
 	}
 
+	// Polymers vertical
+	public String insertPolymersSession(String sessionOption) {
+		if (sessionOption == null || sessionOption.isEmpty()) {
+			return "Session option is required.";
+		}
+		com.zn.polymers.entity.PolymersSessionOption option = new com.zn.polymers.entity.PolymersSessionOption(sessionOption);
+		polymersSessionOption.save(option);
+		return "Session option inserted successfully (polymers).";
+	}
 
 	// Optics vertical
 	public String insertOpticsInterestedInOption(String interestedInOption) {
@@ -221,6 +234,16 @@ public class AdminService {
 		return "Interested In option inserted successfully (nursing).";
 	}
 
+	// Polymers vertical
+	public String insertPolymersInterestedInOption(String interestedInOption) {
+		if (interestedInOption == null || interestedInOption.isEmpty()) {
+			return "Interested In option is required.";
+		}
+		com.zn.polymers.entity.PolymersInterestedInOption option = new com.zn.polymers.entity.PolymersInterestedInOption(interestedInOption);
+		polymersInterestedInOptionsRepo.save(option);
+		return "Interested In option inserted successfully (polymers).";
+	}
+
 	// Optics vertical
 	public List<OpticsForm> getAllOpticsFormSubmissions() {
 		return opticsFormSubmissionRepo.findAll();
@@ -234,6 +257,11 @@ public class AdminService {
 	// Nursing vertical
 	public List<NursingForm> getAllNursingFormSubmissions() {
 		return nursingFormSubmissionRepo.findAll();
+	}
+
+	// Polymers vertical
+	public List<com.zn.polymers.entity.PolymersForm> getAllPolymersFormSubmissions() {
+		return polymersFormSubmissionRepo.findAll();
 	}
 
 
@@ -262,8 +290,14 @@ public class AdminService {
 		return renewableDiscountsRepository.findAll();
 	}
 
+	// Nursing vertical
 	public List<?> getAllNursingDiscounts() {
 		return nursingDiscountsRepository.findAll();
+	}
+
+	// Polymers vertical
+	public List<?> getAllPolymersDiscounts() {
+		return polymersDiscountsRepository.findAll();
 	}
 	// Nursing vertical
 	public String insertNursingAccommodation(com.zn.nursing.entity.NursingAccommodation accommodation) {
@@ -272,6 +306,15 @@ public class AdminService {
 		}
 		nursingAccommodationRepo.save(accommodation);
 		return "Accommodation inserted successfully (nursing).";
+	}
+
+	// Polymers vertical
+	public String insertPolymersAccommodation(com.zn.polymers.entity.PolymersAccommodation accommodation) {
+		if (accommodation == null) {
+			return "Accommodation is required.";
+		}
+		polymersAccommodationRepo.save(accommodation);
+		return "Accommodation inserted successfully (polymers).";
 	}
 
 
@@ -309,6 +352,15 @@ public class AdminService {
 		}
 		config.calculateTotalPrice();
 		return nursingPricingConfigRepository.save(config);
+	}
+
+	// Polymers vertical
+	public com.zn.polymers.entity.PolymersPricingConfig insertPolymersPricingConfig(com.zn.polymers.entity.PolymersPricingConfig config) {
+		if (config == null) {
+			throw new IllegalArgumentException("PricingConfig cannot be null.");
+		}
+		config.calculateTotalPrice();
+		return polymersPricingConfigRepository.save(config);
 	}
 		
 		
@@ -365,6 +417,14 @@ public class AdminService {
 		return nursingPricingConfigRepository.findById(id).orElse(null);
 	}
 
+	// Polymers vertical
+	public com.zn.polymers.entity.PolymersPricingConfig getPolymersPricingConfigById(Long id) {
+		if (id == null) {
+			return null;
+		}
+		return polymersPricingConfigRepository.findById(id).orElse(null);
+	}
+
 
 
 	// Optics vertical
@@ -383,6 +443,11 @@ public class AdminService {
 		return nursingRegistrationFormRepository.findAll();
 	}
 
+	// Polymers vertical
+	public List<com.zn.polymers.entity.PolymersRegistrationForm> getAllPolymersRegistrationForms() {
+		return polymersRegistrationFormRepository.findAll();
+	}
+
 		// --- Admin API: Get all interested-in options for each vertical ---
 	public List<?> getAllOpticsInterestedInOptions() {
 		return opticsInterestedInOptionRepo.findAll();
@@ -396,6 +461,10 @@ public class AdminService {
 		return nursingInterestedInOptionRepo.findAll();
 	}
 
+	public List<?> getAllPolymersInterestedInOptions() {
+		return polymersInterestedInOptionsRepo.findAll();
+	}
+
 	// --- Admin API: Get all session options for each vertical ---
 	public List<?> getAllOpticsSessionOptions() {
 		return opticsSessionOption.findAll();
@@ -407,6 +476,10 @@ public class AdminService {
 
 	public List<?> getAllNursingSessionOptions() {
 		return nursingSessionOption.findAll();
+	}
+
+	public List<?> getAllPolymersSessionOptions() {
+		return polymersSessionOption.findAll();
 	}
 	// --- Edit and Delete Interested-In Option for each vertical (admin) ---
 	// Optics
@@ -438,6 +511,7 @@ public class AdminService {
 	}
 
 	// Nursing
+	// Nursing vertical
 	public void editNursingInterestedInOption(Long id, String newOption) {
 		var optional = nursingInterestedInOptionRepo.findById(id);
 		if (optional == null || optional.isEmpty()) throw new DataProcessingException("Nursing interested-in option not found with ID: " + id);
@@ -449,6 +523,20 @@ public class AdminService {
 	public void deleteNursingInterestedInOption(Long id) {
 		if (id == null || !nursingInterestedInOptionRepo.existsById(id)) throw new DataProcessingException("Nursing interested-in option not found with ID: " + id);
 		nursingInterestedInOptionRepo.deleteById(id);
+	}
+
+	// Polymers vertical
+	public void editPolymersInterestedInOption(Long id, String newOption) {
+		var optional = polymersInterestedInOptionsRepo.findById(id);
+		if (optional == null || optional.isEmpty()) throw new DataProcessingException("Polymers interested-in option not found with ID: " + id);
+		var entity = optional.get();
+		setInterestedInOptionField(entity, newOption);
+		polymersInterestedInOptionsRepo.save(entity);
+	}
+
+	public void deletePolymersInterestedInOption(Long id) {
+		if (id == null || !polymersInterestedInOptionsRepo.existsById(id)) throw new DataProcessingException("Polymers interested-in option not found with ID: " + id);
+		polymersInterestedInOptionsRepo.deleteById(id);
 	}
 
 	// Helper: set the interested-in option field reflectively for all verticals
@@ -527,6 +615,7 @@ public class AdminService {
 	}
 
 	// Nursing
+	// Nursing vertical
 	public void editNursingSession(Long id, String newSessionName) {
 		var optional = nursingSessionOption.findById(id);
 		if (optional == null || optional.isEmpty()) throw new DataProcessingException("Nursing session option not found with ID: " + id);
@@ -538,6 +627,20 @@ public class AdminService {
 	public void deleteNursingSession(Long id) {
 		if (id == null || !nursingSessionOption.existsById(id)) throw new DataProcessingException("Nursing session option not found with ID: " + id);
 		nursingSessionOption.deleteById(id);
+	}
+
+	// Polymers vertical
+	public void editPolymersSession(Long id, String newSessionName) {
+		var optional = polymersSessionOption.findById(id);
+		if (optional == null || optional.isEmpty()) throw new DataProcessingException("Polymers session option not found with ID: " + id);
+		var entity = optional.get();
+		setSessionOptionField(entity, newSessionName);
+		polymersSessionOption.save(entity);
+	}
+
+	public void deletePolymersSession(Long id) {
+		if (id == null || !polymersSessionOption.existsById(id)) throw new DataProcessingException("Polymers session option not found with ID: " + id);
+		polymersSessionOption.deleteById(id);
 	}
 
 	// Helper: set the session option field reflectively for all verticals

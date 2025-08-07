@@ -40,17 +40,21 @@ public class AdminController {	@Autowired
 	@Autowired
 	private JwtUtil jwtUtil;
 	
+
 @Autowired private com.zn.optics.repository.IOpticsPresentationTypeRepo opticsPresentationTypeRepo;
 @Autowired private com.zn.renewable.repository.IRenewablePresentationTypeRepo renewablePresentationTypeRepo;
 @Autowired private com.zn.nursing.repository.INursingPresentationTypeRepo nursingPresentationTypeRepo;
+@Autowired private com.zn.polymers.repository.IPolymersPresentationTypeRepo polymersPresentationTypeRepo;
 
 @Autowired private com.zn.optics.repository.IOpticsAccommodationRepo opticsAccommodationRepo;
 @Autowired private com.zn.renewable.repository.IRenewableAccommodationRepo renewableAccommodationRepo;
 @Autowired private com.zn.nursing.repository.INursingAccommodationRepo nursingAccommodationRepo;
+@Autowired private com.zn.polymers.repository.IPolymersAccommodationRepo polymersAccommodationRepo;
 
 @Autowired private com.zn.optics.repository.IOpticsPricingConfigRepository opticsPricingConfigRepository;
 @Autowired private com.zn.renewable.repository.IRenewablePricingConfigRepository renewablePricingConfigRepository;
 @Autowired private com.zn.nursing.repository.INursingPricingConfigRepository nursingPricingConfigRepository;
+@Autowired private com.zn.polymers.repository.IPolymersPricingConfigRepository polymersPricingConfigRepository;
 
 	// login admin	
 	@PostMapping("/api/admin/login")
@@ -101,51 +105,66 @@ public class AdminController {	@Autowired
 			throw new AdminAuthenticationException("Login failed: " + e.getMessage(), e);
 		}
 	}
-		// insert Sessions in SessionOption table
-	   // Optics session
-	   @PostMapping("/sessions/optics")
-	   @PreAuthorize("hasRole('ADMIN')")
-	   public ResponseEntity<String> insertOpticsSession(@RequestBody SessionOptionDTO dto) {
-			   try {
-					   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
-							   throw new IllegalArgumentException("Session option is required and cannot be empty");
-					   }
-					   String result = adminService.insertOpticsSession(dto.getSessionOption().trim());
-					   return ResponseEntity.ok(result);
-			   } catch (Exception e) {
-					   throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
-			   }
-	   }
 
-	   // Renewable session
-	   @PostMapping("/sessions/renewable")
-	   @PreAuthorize("hasRole('ADMIN')")
-	   public ResponseEntity<String> insertRenewableSession(@RequestBody SessionOptionDTO dto) {
-			   try {
-					   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
-							   throw new IllegalArgumentException("Session option is required and cannot be empty");
-					   }
-					   String result = adminService.insertRenewableSession(dto.getSessionOption().trim());
-					   return ResponseEntity.ok(result);
-			   } catch (Exception e) {
-					   throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
-			   }
-	   }
+   // Optics session
+   @PostMapping("/sessions/optics")
+   @PreAuthorize("hasRole('ADMIN')")
+   public ResponseEntity<String> insertOpticsSession(@RequestBody SessionOptionDTO dto) {
+		   try {
+				   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
+						   throw new IllegalArgumentException("Session option is required and cannot be empty");
+				   }
+				   String result = adminService.insertOpticsSession(dto.getSessionOption().trim());
+				   return ResponseEntity.ok(result);
+		   } catch (Exception e) {
+				   throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
+		   }
+   }
 
-	   // Nursing session
-	   @PostMapping("/sessions/nursing")
-	   @PreAuthorize("hasRole('ADMIN')")
-	   public ResponseEntity<String> insertNursingSession(@RequestBody SessionOptionDTO dto) {
-			   try {
-					   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
-							   throw new IllegalArgumentException("Session option is required and cannot be empty");
-					   }
-					   String result = adminService.insertNursingSession(dto.getSessionOption().trim());
-					   return ResponseEntity.ok(result);
-			   } catch (Exception e) {
-					   throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
-			   }
-	   }
+   // Renewable session
+   @PostMapping("/sessions/renewable")
+   @PreAuthorize("hasRole('ADMIN')")
+   public ResponseEntity<String> insertRenewableSession(@RequestBody SessionOptionDTO dto) {
+		   try {
+				   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
+						   throw new IllegalArgumentException("Session option is required and cannot be empty");
+				   }
+				   String result = adminService.insertRenewableSession(dto.getSessionOption().trim());
+				   return ResponseEntity.ok(result);
+		   } catch (Exception e) {
+				   throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
+		   }
+   }
+
+   // Nursing session
+   @PostMapping("/sessions/nursing")
+   @PreAuthorize("hasRole('ADMIN')")
+   public ResponseEntity<String> insertNursingSession(@RequestBody SessionOptionDTO dto) {
+		   try {
+				   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
+						   throw new IllegalArgumentException("Session option is required and cannot be empty");
+				   }
+				   String result = adminService.insertNursingSession(dto.getSessionOption().trim());
+				   return ResponseEntity.ok(result);
+		   } catch (Exception e) {
+				   throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
+		   }
+   }
+
+   // Polymers session
+   @PostMapping("/sessions/polymers")
+   @PreAuthorize("hasRole('ADMIN')")
+   public ResponseEntity<String> insertPolymersSession(@RequestBody SessionOptionDTO dto) {
+		   try {
+				   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
+						   throw new IllegalArgumentException("Session option is required and cannot be empty");
+				   }
+				   String result = adminService.insertPolymersSession(dto.getSessionOption().trim());
+				   return ResponseEntity.ok(result);
+		   } catch (Exception e) {
+				   throw new DataProcessingException("Failed to insert session: " + e.getMessage(), e);
+		   }
+   }
 	// Optics interested-in
 	@PostMapping("/interested-in/optics")
 	public ResponseEntity<String> insertOpticsInterestedInOption(@RequestBody InterestedInOptionDTO dto) {
@@ -183,6 +202,20 @@ public class AdminController {	@Autowired
 			}
 			adminService.insertNursingInterestedInOption(dto.getInterestedInOption().trim());
 			return ResponseEntity.ok("Interested In option inserted successfully (nursing).");
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to insert interested in option: " + e.getMessage(), e);
+		}
+	}
+
+	// Polymers interested-in
+	@PostMapping("/interested-in/polymers")
+	public ResponseEntity<String> insertPolymersInterestedInOption(@RequestBody InterestedInOptionDTO dto) {
+		try {
+			if (dto == null || dto.getInterestedInOption() == null || dto.getInterestedInOption().trim().isEmpty()) {
+				throw new IllegalArgumentException("Interested In option is required and cannot be empty");
+			}
+			adminService.insertPolymersInterestedInOption(dto.getInterestedInOption().trim());
+			return ResponseEntity.ok("Interested In option inserted successfully (polymers).");
 		} catch (Exception e) {
 			throw new DataProcessingException("Failed to insert interested in option: " + e.getMessage(), e);
 		}
@@ -232,6 +265,21 @@ public class AdminController {	@Autowired
 			throw new DataProcessingException("Failed to insert accommodation: " + e.getMessage(), e);
 		}
 	}
+
+	// Polymers accommodation
+	@PostMapping("/api/admin/accommodation/polymers")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<String> insertPolymersAccommodation(@RequestBody com.zn.polymers.entity.PolymersAccommodation accommodation) {
+		try {
+			if (accommodation == null) {
+				throw new IllegalArgumentException("Accommodation is required");
+			}
+			adminService.insertPolymersAccommodation(accommodation);
+			return ResponseEntity.ok("Accommodation inserted successfully (polymers).");
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to insert accommodation: " + e.getMessage(), e);
+		}
+	}
 	// Optics pricing config
 	@PostMapping("/api/admin/pricing-config/optics")
 	@PreAuthorize("hasRole('ADMIN')")
@@ -265,6 +313,19 @@ public class AdminController {	@Autowired
 		try {
 			adminService.insertNursingPricingConfig(config);
 			return ResponseEntity.ok("Pricing config inserted successfully (nursing).");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+				.body("Failed to insert pricing config: " + e.getMessage());
+		}
+	}
+
+	// Polymers pricing config
+	@PostMapping("/api/admin/pricing-config/polymers")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> insertPolymersPricingConfig(@RequestBody com.zn.polymers.entity.PolymersPricingConfig config) {
+		try {
+			adminService.insertPolymersPricingConfig(config);
+			return ResponseEntity.ok("Pricing config inserted successfully (polymers).");
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 				.body("Failed to insert pricing config: " + e.getMessage());
@@ -331,6 +392,22 @@ public ResponseEntity<?> getNursingPricingConfigDetails(@PathVariable Long id) {
 	}
 }
 
+@PostMapping("/api/admin/pricing-config/details/polymers/{id}")
+public ResponseEntity<?> getPolymersPricingConfigDetails(@PathVariable Long id) {
+	try {
+		if (id == null) {
+			throw new IllegalArgumentException("Pricing config ID is required");
+		}
+		com.zn.polymers.entity.PolymersPricingConfig config = adminService.getPolymersPricingConfigById(id);
+		if (config == null) {
+			throw new ResourceNotFoundException("Polymers pricing config not found with ID: " + id);
+		}
+		return ResponseEntity.ok(config);
+	} catch (Exception e) {
+		throw new DataProcessingException("Failed to retrieve polymers pricing config: " + e.getMessage(), e);
+	}
+}
+
 // get all registration forms for each vertical
 @PostMapping("/api/admin/registration-forms/optics")
 @PreAuthorize("hasRole('ADMIN')")
@@ -359,6 +436,16 @@ public ResponseEntity<?> getAllNursingRegistrationForms() {
 		return ResponseEntity.ok(adminService.getAllNursingRegistrationForms());
 	} catch (Exception e) {
 		throw new DataProcessingException("Failed to retrieve nursing registration forms: " + e.getMessage(), e);
+	}
+}
+
+@PostMapping("/api/admin/registration-forms/polymers")
+@PreAuthorize("hasRole('ADMIN')")
+public ResponseEntity<?> getAllPolymersRegistrationForms() {
+	try {
+		return ResponseEntity.ok(adminService.getAllPolymersRegistrationForms());
+	} catch (Exception e) {
+		throw new DataProcessingException("Failed to retrieve polymers registration forms: " + e.getMessage(), e);
 	}
 }
 	
@@ -393,6 +480,16 @@ public ResponseEntity<?> getAllNursingAbstractSubmissions() {
 		return ResponseEntity.ok(adminService.getAllNursingFormSubmissions());
 	} catch (Exception e) {
 		throw new DataProcessingException("Failed to retrieve nursing abstract submissions: " + e.getMessage(), e);
+	}
+}
+
+@GetMapping("/api/admin/abstract-submissions/polymers")
+@PreAuthorize("hasRole('ADMIN')")
+public ResponseEntity<?> getAllPolymersAbstractSubmissions() {
+	try {
+		return ResponseEntity.ok(adminService.getAllPolymersFormSubmissions());
+	} catch (Exception e) {
+		throw new DataProcessingException("Failed to retrieve polymers abstract submissions: " + e.getMessage(), e);
 	}
 }
 	
@@ -449,6 +546,16 @@ public ResponseEntity<?> getAllNursingAbstractSubmissions() {
 		}
 	}
 
+	@GetMapping("/api/admin/interested-in/polymers")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllPolymersInterestedInOptions() {
+		try {
+			return ResponseEntity.ok(adminService.getAllPolymersInterestedInOptions());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve polymers interested-in options: " + e.getMessage(), e);
+		}
+	}
+
 	// Get all session options for each vertical (admin)
 	@GetMapping("/api/admin/session-options/optics")
 	@PreAuthorize("hasRole('ADMIN')")
@@ -477,6 +584,16 @@ public ResponseEntity<?> getAllNursingAbstractSubmissions() {
 			return ResponseEntity.ok(adminService.getAllNursingSessionOptions());
 		} catch (Exception e) {
 			throw new DataProcessingException("Failed to retrieve nursing session options: " + e.getMessage(), e);
+		}
+	}
+
+	@GetMapping("/api/admin/session-options/polymers")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllPolymersSessionOptions() {
+		try {
+			return ResponseEntity.ok(adminService.getAllPolymersSessionOptions());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve polymers session options: " + e.getMessage(), e);
 		}
 	}
 	
@@ -557,6 +674,31 @@ public ResponseEntity<?> editNursingAccommodation(@PathVariable Long id, @Reques
 	}
 }
 
+@PostMapping("/api/admin/accommodation/edit/polymers/{id}")
+@PreAuthorize("hasRole('ADMIN')")
+public ResponseEntity<?> editPolymersAccommodation(@PathVariable Long id, @RequestBody com.zn.polymers.entity.PolymersAccommodation updatedAccommodation) {
+	try {
+		Optional<com.zn.polymers.entity.PolymersAccommodation> optionalAccommodation = polymersAccommodationRepo.findById(id);
+		if (optionalAccommodation.isEmpty()) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Polymers Accommodation not found with ID: " + id);
+		}
+		com.zn.polymers.entity.PolymersAccommodation accommodation = optionalAccommodation.get();
+		accommodation.setNights(updatedAccommodation.getNights());
+		accommodation.setGuests(updatedAccommodation.getGuests());
+		accommodation.setPrice(updatedAccommodation.getPrice());
+		polymersAccommodationRepo.save(accommodation);
+
+		var pricingConfigs = polymersPricingConfigRepository.findByAccommodationOption(accommodation);
+		for (com.zn.polymers.entity.PolymersPricingConfig config : pricingConfigs) {
+			config.calculateTotalPrice();
+			polymersPricingConfigRepository.save(config);
+		}
+		return ResponseEntity.ok("Polymers accommodation and related pricing configs updated successfully.");
+	} catch (Exception ex) {
+		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update polymers accommodation: " + ex.getMessage());
+	}
+}
+
 // Delete accommodation combo for each vertical
 @PostMapping("/api/admin/accommodation/delete/optics/{id}")
 @PreAuthorize("hasRole('ADMIN')")
@@ -600,6 +742,20 @@ public ResponseEntity<?> deleteNursingAccommodation(@PathVariable Long id) {
 	}
 }
 
+@PostMapping("/api/admin/accommodation/delete/polymers/{id}")
+@PreAuthorize("hasRole('ADMIN')")
+public ResponseEntity<?> deletePolymersAccommodation(@PathVariable Long id) {
+	try {
+		if (!polymersAccommodationRepo.existsById(id)) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Polymers Accommodation not found with ID: " + id);
+		}
+		polymersAccommodationRepo.deleteById(id);
+		return ResponseEntity.ok("Polymers accommodation deleted successfully.");
+	} catch (Exception e) {
+		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete polymers accommodation: " + e.getMessage());
+	}
+}
+
 // get all presentation types for each vertical
 @GetMapping("/api/admin/presentation-types/optics")
 @PreAuthorize("hasRole('ADMIN')")
@@ -628,6 +784,16 @@ public ResponseEntity<?> getAllNursingPresentationTypes() {
 		return ResponseEntity.ok(nursingPresentationTypeRepo.findAll());
 	} catch (Exception e) {
 		throw new DataProcessingException("Failed to retrieve nursing presentation types: " + e.getMessage(), e);
+	}
+}
+
+@GetMapping("/api/admin/presentation-types/polymers")
+@PreAuthorize("hasRole('ADMIN')")
+public ResponseEntity<?> getAllPolymersPresentationTypes() {
+	try {
+		return ResponseEntity.ok(polymersPresentationTypeRepo.findAll());
+	} catch (Exception e) {
+		throw new DataProcessingException("Failed to retrieve polymers presentation types: " + e.getMessage(), e);
 	}
 }
 
@@ -701,6 +867,29 @@ public ResponseEntity<?> editNursingPresentationType(@PathVariable Long id, @Pat
 	}
 }
 
+@PostMapping("/api/admin/presentation-type/edit/polymers/{id}/{price}")
+@PreAuthorize("hasRole('ADMIN')")
+public ResponseEntity<?> editPolymersPresentationType(@PathVariable Long id, @PathVariable BigDecimal price) {
+	try {
+		Optional<com.zn.polymers.entity.PolymersPresentationType> optionalType = polymersPresentationTypeRepo.findById(id);
+		if (optionalType.isEmpty()) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Polymers Presentation type not found with ID: " + id);
+		}
+		com.zn.polymers.entity.PolymersPresentationType type = optionalType.get();
+		type.setPrice(price);
+		polymersPresentationTypeRepo.save(type);
+
+		var pricingConfigs = polymersPricingConfigRepository.findByPresentationType(type);
+		for (com.zn.polymers.entity.PolymersPricingConfig config : pricingConfigs) {
+			config.calculateTotalPrice();
+			polymersPricingConfigRepository.save(config);
+		}
+		return ResponseEntity.ok("Polymers presentation type and related pricing configs updated successfully.");
+	} catch (Exception ex) {
+		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update polymers presentation type: " + ex.getMessage());
+	}
+}
+
 // Recalculate totalPrice for all PricingConfig rows for each vertical
 @PostMapping("/api/admin/pricing-config/recalculate-all/optics")
 @PreAuthorize("hasRole('ADMIN')")
@@ -749,6 +938,22 @@ public ResponseEntity<?> recalculateAllNursingPricingConfigs() {
 		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to recalculate nursing pricing configs: " + e.getMessage());
 	}
 }
+
+@PostMapping("/api/admin/pricing-config/recalculate-all/polymers")
+@PreAuthorize("hasRole('ADMIN')")
+public ResponseEntity<?> recalculateAllPolymersPricingConfigs() {
+	try {
+		Iterable<com.zn.polymers.entity.PolymersPricingConfig> allConfigs = polymersPricingConfigRepository.findAll();
+		int updatedCount = 0;
+		for (com.zn.polymers.entity.PolymersPricingConfig config : allConfigs) {
+			polymersPricingConfigRepository.save(config);
+			updatedCount++;
+		}
+		return ResponseEntity.ok("Recalculated totalPrice for " + updatedCount + " polymers pricing configs.");
+	} catch (Exception e) {
+		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to recalculate polymers pricing configs: " + e.getMessage());
+	}
+}
 	// Get all accommodation combos for each vertical (admin)
 	@GetMapping("/api/admin/accommodation/optics")
 	@PreAuthorize("hasRole('ADMIN')")
@@ -777,6 +982,16 @@ public ResponseEntity<?> recalculateAllNursingPricingConfigs() {
 			return ResponseEntity.ok(nursingAccommodationRepo.findAll());
 		} catch (Exception e) {
 			throw new DataProcessingException("Failed to retrieve nursing accommodations: " + e.getMessage(), e);
+		}
+	}
+
+	@GetMapping("/api/admin/accommodation/polymers")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllPolymersAccommodations() {
+		try {
+			return ResponseEntity.ok(polymersAccommodationRepo.findAll());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve polymers accommodations: " + e.getMessage(), e);
 		}
 	}
 		// Edit interested-in option for each vertical (admin)
@@ -825,6 +1040,20 @@ public ResponseEntity<?> recalculateAllNursingPricingConfigs() {
 		}
 	}
 
+	@PostMapping("/api/admin/interested-in/edit/polymers/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> editPolymersInterestedInOption(@PathVariable Long id, @RequestBody InterestedInOptionDTO dto) {
+		try {
+			if (dto == null || dto.getInterestedInOption() == null || dto.getInterestedInOption().trim().isEmpty()) {
+				return ResponseEntity.badRequest().body("Invalid interested-in option");
+			}
+			adminService.editPolymersInterestedInOption(id, dto.getInterestedInOption().trim());
+			return ResponseEntity.ok("Polymers interested-in option updated successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to update polymers interested-in option: " + e.getMessage());
+		}
+	}
+
 	// Delete interested-in option for each vertical (admin)
 	@PostMapping("/api/admin/interested-in/delete/optics/{id}")
 	@PreAuthorize("hasRole('ADMIN')")
@@ -856,6 +1085,17 @@ public ResponseEntity<?> recalculateAllNursingPricingConfigs() {
 			return ResponseEntity.ok("Nursing interested-in option deleted successfully.");
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete nursing interested-in option: " + e.getMessage());
+		}
+	}
+
+	@PostMapping("/api/admin/interested-in/delete/polymers/{id}")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> deletePolymersInterestedInOption(@PathVariable Long id) {
+		try {
+			adminService.deletePolymersInterestedInOption(id);
+			return ResponseEntity.ok("Polymers interested-in option deleted successfully.");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to delete polymers interested-in option: " + e.getMessage());
 		}
 	}
 	
@@ -898,6 +1138,20 @@ public ResponseEntity<?> recalculateAllNursingPricingConfigs() {
 					   throw new DataProcessingException("Failed to update session option: " + e.getMessage(), e);
 			   }
 	   }
+
+	   @PostMapping("/api/admin/sessions/polymers/{id}/edit")
+	   @PreAuthorize("hasRole('ADMIN')")
+	   public ResponseEntity<?> editPolymersSession(@PathVariable Long id, @RequestBody SessionOptionDTO dto) {
+			   try {
+					   if (dto == null || dto.getSessionOption() == null || dto.getSessionOption().trim().isEmpty()) {
+							   throw new IllegalArgumentException("Session option is required and cannot be empty");
+					   }
+					   adminService.editPolymersSession(id, dto.getSessionOption().trim());
+					   return ResponseEntity.ok("Session option updated successfully (polymers).");
+			   } catch (Exception e) {
+					   throw new DataProcessingException("Failed to update session option: " + e.getMessage(), e);
+			   }
+	   }
 	// Get all discount records for Optics
 	@GetMapping("/api/admin/discounts/optics")
 	@PreAuthorize("hasRole('ADMIN')")
@@ -931,12 +1185,34 @@ public ResponseEntity<?> recalculateAllNursingPricingConfigs() {
 		}
 	}
 
+	// Get all discount records for Polymers
+	@GetMapping("/api/admin/discounts/polymers")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> getAllPolymersDiscounts() {
+		try {
+			return ResponseEntity.ok(adminService.getAllPolymersDiscounts());
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to retrieve polymers discounts: " + e.getMessage(), e);
+		}
+	}
+
 	@PostMapping("/api/admin/sessions/renewable/{id}/delete")
 	@PreAuthorize("hasRole('ADMIN')")
 	public ResponseEntity<?> deleteRenewableSession(@PathVariable Long id) {
 		try {
 			adminService.deleteRenewableSession(id);
 			return ResponseEntity.ok("Session option deleted successfully (renewable).");
+		} catch (Exception e) {
+			throw new DataProcessingException("Failed to delete session option: " + e.getMessage(), e);
+		}
+	}
+
+	@PostMapping("/api/admin/sessions/polymers/{id}/delete")
+	@PreAuthorize("hasRole('ADMIN')")
+	public ResponseEntity<?> deletePolymersSession(@PathVariable Long id) {
+		try {
+			adminService.deletePolymersSession(id);
+			return ResponseEntity.ok("Session option deleted successfully (polymers).");
 		} catch (Exception e) {
 			throw new DataProcessingException("Failed to delete session option: " + e.getMessage(), e);
 		}
