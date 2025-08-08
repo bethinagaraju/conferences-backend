@@ -17,10 +17,10 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.zn.dto.AbstractSubmissionRequestDTO;
-import com.zn.nursing.entity.NursingForm;
-import com.zn.nursing.repository.INursingFormSubmissionRepo;
-import com.zn.nursing.repository.INursingIntrestedInOptionsRepo;
-import com.zn.nursing.repository.INursingSessionOption;
+import com.zn.polymers.entity.PolymersForm;
+import com.zn.polymers.repository.IPolymersFormSubmissionRepo;
+import com.zn.polymers.repository.IPolymersInterestedInOptionsRepo;
+import com.zn.polymers.repository.IPolymersSessionOption;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -40,16 +40,16 @@ public class PolymersFormSubmissionService {
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Autowired
-    private INursingFormSubmissionRepo formSubmissionRepo;
+    private IPolymersFormSubmissionRepo formSubmissionRepo;
 
     @Autowired
-    private INursingIntrestedInOptionsRepo interestedInRepo;
+    private IPolymersInterestedInOptionsRepo interestedInRepo;
 
     @Autowired
-    private INursingSessionOption sessionOptionsRepo;
+    private IPolymersSessionOption sessionOptionsRepo;
 
-    public NursingForm saveSubmission(AbstractSubmissionRequestDTO request) {
-        NursingForm formSubmission = new NursingForm();
+    public PolymersForm saveSubmission(AbstractSubmissionRequestDTO request) {
+        PolymersForm formSubmission = new PolymersForm();
 
         // Set basic fields
         formSubmission.setTitlePrefix(request.getTitlePrefix());
@@ -86,8 +86,8 @@ public class PolymersFormSubmissionService {
             }
 
             String fileName = file.getOriginalFilename();
-            // Store in a folder named after the service: 'nursing/{userId}/{fileName}'
-            String pathInBucket = "nursing/" + userId + "/" + fileName;
+            // Store in a folder named after the service: 'polymers/{userId}/{fileName}'
+            String pathInBucket = "polymers/" + userId + "/" + fileName;
 
             String uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/" + pathInBucket;
 
