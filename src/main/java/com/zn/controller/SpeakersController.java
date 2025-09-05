@@ -97,7 +97,7 @@ public class SpeakersController {
         }
     }
     @PutMapping("/renewable/edit")
-    @PreAuthorize("hasRole('ADMIN')")
+//    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> editRenewableSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         log.info("[ENTRY] editRenewableSpeaker called with DTO: {}", speakerAddRequestDTO);
         try {
@@ -154,7 +154,7 @@ public class SpeakersController {
     }
     // while adding speakers first upload the image and then add the speaker url in the database
     @PostMapping("/renewable/add")
-   @PreAuthorize("hasRole('ADMIN')")
+//   @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addRenewableSpeaker(@ModelAttribute SpeakerAddRequestDTO speakerAddRequestDTO) {
         log.info("[ENTRY] addRenewableSpeaker called with DTO: {}", speakerAddRequestDTO);
         try {

@@ -1,40 +1,36 @@
 package com.zn.polymers.service;
 
+import com.zn.config.HostingerFtpClient;
 import com.zn.polymers.entity.PolymersSpeakers;
 import com.zn.polymers.repository.IPolymersSpeakersRepository;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class PolymersSpeakersService {
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     private IPolymersSpeakersRepository polymersSpeakersRepository;
 
-    @org.springframework.beans.factory.annotation.Autowired
-    private com.zn.config.SupabaseStorageClient storageClient;
+    @Autowired
+    private HostingerFtpClient hostingerFtpClient;
 
-    @Value("${supabase.url}")
-    private String SUPABASE_URL;
-
-    @Value("${supabase.bucket}")
-    private String BUCKET_NAME;
-
-    @Value("${supabase.api.key}")
-    private String SUPABASE_API_KEY;
+    @Value("${hostinger.public.url}")
+    private String HOSTINGER_PUBLIC_URL;
 
     public List<?> getAllSpeakers() {
         return polymersSpeakersRepository.findAll();
     }
 
-    // Save speaker with image upload to Supabase bucket
-    @org.springframework.beans.factory.annotation.Autowired
-    private org.springframework.web.client.RestTemplate restTemplate;
+    // Save speaker with image upload to Hostinger FTP
 
     public void addSpeaker(PolymersSpeakers speaker, org.springframework.web.multipart.MultipartFile image) throws Exception {
         String imageName = speaker.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".jpg";
-        String publicUrl = storageClient.uploadFile("polymersspeakers/" + imageName, image.getInputStream(), image.getSize());
+        // To avoid caching issues, append a timestamp query param to image URL
+        hostingerFtpClient.uploadFile(imageName, image.getInputStream());
+        String publicUrl = HOSTINGER_PUBLIC_URL + "/" + imageName + "?t=" + System.currentTimeMillis();
         speaker.setImageUrl(publicUrl);
         polymersSpeakersRepository.save(speaker);
     }
@@ -51,7 +47,10 @@ public class PolymersSpeakersService {
         existing.setType(speaker.getType());
         if (imageBytes != null && imageBytes.length > 0) {
             String imageName = speaker.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".jpg";
-            String publicUrl = storageClient.uploadFile("polymersspeakers/" + imageName, new java.io.ByteArrayInputStream(imageBytes), imageBytes.length);
+            java.io.ByteArrayInputStream inputStream = new java.io.ByteArrayInputStream(imageBytes);
+            // To avoid caching issues, append a timestamp query param to image URL
+            hostingerFtpClient.uploadFile(imageName, inputStream);
+            String publicUrl = HOSTINGER_PUBLIC_URL + "/" + imageName + "?t=" + System.currentTimeMillis();
             existing.setImageUrl(publicUrl);
         }
         polymersSpeakersRepository.save(existing);

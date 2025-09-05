@@ -1,11 +1,13 @@
 package com.zn.optics.service;
 
+import java.io.ByteArrayInputStream;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.zn.config.HostingerFtpClient;
 import com.zn.optics.entity.OpticsSpeakers;
 import com.zn.optics.repository.IOpticsSpeakersRepository;
 
@@ -14,39 +16,26 @@ public class OpticsSpeakersService {
     @Autowired
     private IOpticsSpeakersRepository opticsSpeakersRepository;
 
-    @Value("${supabase.url}")
-    private String SUPABASE_URL;
+    @Autowired
+    private HostingerFtpClient hostingerFtpClient;
 
-    @Value("${supabase.bucket}")
-    private String BUCKET_NAME;
-
-    @Value("${supabase.api.key}")
-    private String SUPABASE_API_KEY;
+    @Value("${hostinger.public.url}")
+    private String HOSTINGER_PUBLIC_URL;
 
     public List<?> getAllSpeakers() {
         return opticsSpeakersRepository.findAll();
     }
 
-    // Save speaker with image upload to Supabase bucket
-    @Autowired
-    private org.springframework.web.client.RestTemplate restTemplate;
+    // Save speaker with image upload to Hostinger FTP
 
     public void addSpeaker(OpticsSpeakers speaker, byte[] imageBytes) {
         String imageUrl = null;
         try {
             String imageName = speaker.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".jpg";
-            String uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/opticsspeakers/" + imageName;
-            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-            headers.set("Authorization", "Bearer " + SUPABASE_API_KEY);
-            headers.set("apikey", SUPABASE_API_KEY);
-            headers.setContentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
-            org.springframework.http.HttpEntity<byte[]> entity = new org.springframework.http.HttpEntity<>(imageBytes, headers);
-            org.springframework.http.ResponseEntity<String> response = restTemplate.exchange(uploadUrl, org.springframework.http.HttpMethod.PUT, entity, String.class);
-            if (response.getStatusCode().is2xxSuccessful()) {
-                imageUrl = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/opticsspeakers/" + imageName;
-            } else {
-                throw new RuntimeException("Image upload failed: " + response.getStatusCode().value());
-            }
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(imageBytes);
+            // To avoid caching issues, append a timestamp query param to image URL
+            hostingerFtpClient.uploadFile(imageName, inputStream);
+            imageUrl = HOSTINGER_PUBLIC_URL + "/" + imageName + "?t=" + System.currentTimeMillis();
         } catch (Exception e) {
             throw new RuntimeException("Image upload error: " + e.getMessage(), e);
         }
@@ -68,18 +57,10 @@ public class OpticsSpeakersService {
             String imageUrl = null;
             try {
                 String imageName = speaker.getName().replaceAll("[^a-zA-Z0-9]", "_") + ".jpg";
-                String uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/opticsspeakers/" + imageName;
-                org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-                headers.set("Authorization", "Bearer " + SUPABASE_API_KEY);
-                headers.set("apikey", SUPABASE_API_KEY);
-                headers.setContentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
-                org.springframework.http.HttpEntity<byte[]> entity = new org.springframework.http.HttpEntity<>(imageBytes, headers);
-                org.springframework.http.ResponseEntity<String> response = restTemplate.exchange(uploadUrl, org.springframework.http.HttpMethod.PUT, entity, String.class);
-                if (response.getStatusCode().is2xxSuccessful()) {
-                    imageUrl = SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/opticsspeakers/" + imageName;
-                } else {
-                    throw new RuntimeException("Image upload failed: " + response.getStatusCode().value());
-                }
+                ByteArrayInputStream inputStream = new ByteArrayInputStream(imageBytes);
+                // To avoid caching issues, append a timestamp query param to image URL
+                hostingerFtpClient.uploadFile(imageName, inputStream);
+                imageUrl = HOSTINGER_PUBLIC_URL + "/" + imageName + "?t=" + System.currentTimeMillis();
             } catch (Exception e) {
                 throw new RuntimeException("Image upload error: " + e.getMessage(), e);
             }

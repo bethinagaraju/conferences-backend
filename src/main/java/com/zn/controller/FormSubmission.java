@@ -33,7 +33,6 @@ public class FormSubmission {
 	@Autowired
 	private RenewableFormSubmissionService renewableFormSubmissionService;
 	
-	
 	@Autowired
 	private PolymersFormSubmissionService polymersFormSubmissionService;
 	
@@ -114,7 +113,22 @@ public class FormSubmission {
 		} else {
 			return ResponseEntity.badRequest().body("Origin or Referer header is missing");
 		}
-		return ResponseEntity.ok(sessionOptions);    
+		return ResponseEntity.ok(sessionOptions);
+	}
+
+	// Get all form submissions for renewable
+	@GetMapping("/get-submissions")
+	public ResponseEntity<?> getFormSubmissions(HttpServletRequest httpRequest) {
+		String origin = httpRequest.getHeader("Origin");
+		if (origin == null) {
+			origin = httpRequest.getHeader("Referer");
+		}
+		if (origin != null && origin.contains("globalrenewablemeet.com")) {
+			List<?> submissions = renewableFormSubmissionService.getAllFormSubmissions();
+			return ResponseEntity.ok(submissions);
+		} else {
+			return ResponseEntity.badRequest().body("Access denied for this domain");
+		}
 	}
 
 }

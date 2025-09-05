@@ -13,9 +13,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.zn.config.HostingerFtpClient;
 import com.zn.dto.AbstractSubmissionRequestDTO;
 import com.zn.renewable.entity.RenewableForm;
 import com.zn.renewable.repository.IRenewableFormSubmissionRepo;
@@ -28,16 +28,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class  RenewableFormSubmissionService {
 
-    @Value("${supabase.url}")
-    private String SUPABASE_URL;
+    @Value("${hostinger.public.url}")
+    private String hostingerPublicUrl;
 
-    @Value("${supabase.bucket}")
-    private String BUCKET_NAME;
-
-    @Value("${supabase.api.key}")
-    private String SUPABASE_API_KEY;
-
-    private final RestTemplate restTemplate = new RestTemplate();
+    @Autowired
+    private HostingerFtpClient hostingerFtpClient;
 
     @Autowired
     private IRenewableFormSubmissionRepo formSubmissionRepo;
@@ -69,42 +64,30 @@ public class  RenewableFormSubmissionService {
             .flatMap(sessionOptionsRepo::findById)
             .ifPresent(formSubmission::setSession);
 
-        // Upload file to Supabase
+        // Upload file to Hostinger FTP
         MultipartFile file = request.getAbstractFile();
         if (file != null && !file.isEmpty()) {
-            String fileUrl = uploadFileToSupabase(file, request.getEmail());
+            String fileUrl = uploadFileToHostinger(file, request.getEmail());
             formSubmission.setAbstractFilePath(fileUrl);
         }
 
         return formSubmissionRepo.save(formSubmission);
     }
 
-    public String uploadFileToSupabase(MultipartFile file, String userId) {
+    public String uploadFileToHostinger(MultipartFile file, String userId) {
         try {
             if (file.isEmpty()) {
                 return "Upload failed: File is empty";
             }
 
             String fileName = file.getOriginalFilename();
-            // Store in a folder named after the service: 'renewable/{userId}/{fileName}'
-            String pathInBucket = "renewable/" + userId + "/" + fileName;
+            // Store in the same location as speakers images
+            String remoteFileName = "renewable_" + userId.replace("@", "_").replace(".", "_") + "_" + fileName;
 
-            String uploadUrl = SUPABASE_URL + "/storage/v1/object/" + BUCKET_NAME + "/" + pathInBucket;
+            hostingerFtpClient.uploadFile(remoteFileName, file.getInputStream());
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Authorization", "Bearer " + SUPABASE_API_KEY);
-            headers.set("apikey", SUPABASE_API_KEY);
-            headers.setContentType(MediaType.parseMediaType(file.getContentType()));
-
-            HttpEntity<byte[]> entity = new HttpEntity<>(file.getBytes(), headers);
-
-            ResponseEntity<String> response = restTemplate.exchange(uploadUrl, HttpMethod.PUT, entity, String.class);
-
-            if (response.getStatusCode().is2xxSuccessful()) {
-                return SUPABASE_URL + "/storage/v1/object/public/" + BUCKET_NAME + "/" + pathInBucket;
-            } else {
-                return "Upload failed: " + response.getStatusCode();
-            }
+            // Construct the public URL for the uploaded file
+            return hostingerPublicUrl + "/" + remoteFileName;
         } catch (Exception e) {
             e.printStackTrace();
             return "Upload error: " + e.getMessage();
@@ -124,19 +107,23 @@ public class  RenewableFormSubmissionService {
     }
 
     public List<?> getSessionOptions() {
-        
-        
+
+
         try {
             return sessionOptionsRepo.findAll();
         } catch (Exception e) {
             e.printStackTrace();
             return null; // or handle the error appropriately
         }
-        
+
     }
-    //Get all form submissions 
-    
-    
-    
-    
+
+    public List<RenewableForm> getAllFormSubmissions() {
+        try {
+            return formSubmissionRepo.findAll();
+        } catch (Exception e) {
+            log.error("Error retrieving all form submissions: ", e);
+            return null;
+        }
+    }
 }
